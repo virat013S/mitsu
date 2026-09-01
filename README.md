@@ -384,6 +384,111 @@ Want to make Mitsu better? Here's how:
 
 ---
 
+## Android Version (APK)
+
+Mitsu also works on Android! The mobile version includes all the core features — chat, voice, emotions, file management, weather, jokes, and more.
+
+### What Works on Android
+
+| Feature | Status |
+|---------|--------|
+| **Text Chat** | Full support — Gemini, Ollama, OpenRouter |
+| **Voice Input** | Speech-to-text via Android mic |
+| **Voice Output** | Text-to-speech with mood-based pitch |
+| **Emotions** | All 7 moods with voice changes |
+| **File Management** | Read, write, list files on device |
+| **Weather** | Real-time weather for any city |
+| **Calculator** | Math evaluation |
+| **Jokes & Facts** | Random jokes and fun facts |
+| **Device Info** | Battery status, OS info |
+| **Web Search** | DuckDuckGo search |
+| **Date/Time** | Current time, date, day of week |
+
+### What Doesn't Work on Android
+
+| Feature | Why |
+|---------|-----|
+| Desktop Control | Android doesn't have desktop APIs |
+| Browser Automation | Selenium/Playwright don't run on Android |
+| Window Management | No window system on mobile |
+| Screenshots | Different API on Android |
+| Deep Research | Background browser mode not available |
+| Presentations | PowerPoint creation not supported |
+| Email (OAuth) | Gmail OAuth flow different on mobile |
+
+### Building the APK
+
+**Option 1: Build on Your Computer (Recommended)**
+
+```bash
+# Install Buildozer
+pip install buildozer
+
+# Go to the android directory
+cd mitsu/android
+
+# Build debug APK
+buildozer android debug
+
+# Build release APK (needs signing key)
+buildozer android release
+```
+
+The APK will be in `android/bin/`.
+
+**Option 2: Use Google Colab (No install needed)**
+
+1. Open [Google Colab](https://colab.research.google.com)
+2. Run these commands in a cell:
+
+```python
+!pip install buildozer
+!git clone https://github.com/virat013S/mitsu.git
+%cd mitsu/android
+!buildozer android debug
+```
+
+3. Download the APK from `android/bin/`
+
+**Option 3: Pre-built APK**
+
+Check the [Releases page](https://github.com/virat013S/mitsu/releases) for pre-built APKs.
+
+### Installing on Android
+
+1. Download the APK file
+2. Enable "Install from unknown sources" in Android Settings > Security
+3. Open the APK file
+4. Grant permissions (microphone, storage)
+5. Enter your Gemini API key
+6. Start chatting!
+
+### Android Requirements
+
+- **Android 7.0+** (API 24)
+- **RAM:** 1GB free
+- **Storage:** ~50MB for app + dependencies
+- **Internet:** Required for API calls
+
+### Mobile vs Desktop
+
+| Feature | Desktop | Android |
+|---------|---------|---------|
+| Voice Chat | Gemini Live | Gemini text + TTS |
+| Desktop Control | Full | N/A |
+| Browser Automation | Full | N/A |
+| File Management | Full | Basic (device storage) |
+| Emotions | Full | Full |
+| Emotions + Voice | Full | Full |
+| Presentations | Full | N/A |
+| Deep Research | Full | N/A |
+| Weather | Full | Full |
+| Calculator | Full | Full |
+| Jokes/Facts | Full | Full |
+| Install Size | ~2GB | ~50MB |
+
+---
+
 ## One Last Thing
 
 Mitsu is built by a 13-year-old who just wanted something cool. If you like it, star the repo. If you don't, open an issue and tell me what to fix.

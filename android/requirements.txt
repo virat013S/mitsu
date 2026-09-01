@@ -1,0 +1,4 @@
+# Mitsu Android Dependencies
+kivy>=2.2.0
+plyer>=2.1.0
+pyjnius>=1.3.0
