@@ -4682,6 +4682,7 @@ class SetupOverlay(QWidget):
         self._validation_pending = False
         self._purge_saved_on_failure = False
         self._verified_key = ""
+        self._selected_provider = "gemini"
         self.validation_finished.connect(self._on_validation_finished)
 
         layout = QVBoxLayout(self)
@@ -4705,8 +4706,43 @@ class SetupOverlay(QWidget):
         sep.setStyleSheet(f"color: {C.BORDER};"); layout.addWidget(sep)
         layout.addSpacing(4)
 
-        layout.addWidget(_lbl("GEMINI API KEY", 8, color=C.TEXT_DIM,
+        # ── Provider Selector ──────────────────────────────────────────────
+        layout.addWidget(_lbl("AI PROVIDER", 8, color=C.TEXT_DIM,
                                align=Qt.AlignmentFlag.AlignLeft))
+
+        prov_row = QHBoxLayout(); prov_row.setSpacing(6)
+        self._prov_btns: dict[str, QPushButton] = {}
+        for key, label in [
+            ("gemini",     "☁  Cloud (Gemini)"),
+            ("ollama",     "⚡ Local (Ollama)"),
+            ("openrouter", "🌐 OpenRouter"),
+        ]:
+            btn = QPushButton(label)
+            btn.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+            btn.setFixedHeight(32)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(lambda _, k=key: self._sel_provider(k))
+            prov_row.addWidget(btn)
+            self._prov_btns[key] = btn
+        layout.addLayout(prov_row)
+        self._sel_provider("gemini")
+        layout.addSpacing(6)
+
+        sep_prov = QFrame(); sep_prov.setFrameShape(QFrame.Shape.HLine)
+        sep_prov.setStyleSheet(f"color: {C.BORDER};"); layout.addWidget(sep_prov)
+        layout.addSpacing(4)
+
+        # ── API Key Section (hidden for Ollama) ────────────────────────────
+        self._key_section = QWidget()
+        self._key_section.setStyleSheet("background: transparent;")
+        key_layout = QVBoxLayout(self._key_section)
+        key_layout.setContentsMargins(0, 0, 0, 0)
+        key_layout.setSpacing(6)
+
+        self._key_label = _lbl("GEMINI API KEY", 8, color=C.TEXT_DIM,
+                               align=Qt.AlignmentFlag.AlignLeft)
+        key_layout.addWidget(self._key_label)
+
         self._key_input = QLineEdit()
         self._key_input.setEchoMode(QLineEdit.EchoMode.Password)
         self._key_input.setPlaceholderText("Paste Gemini API key")
@@ -4719,14 +4755,14 @@ class SetupOverlay(QWidget):
             }}
             QLineEdit:focus {{ border: 1px solid {C.PRI}; }}
         """)
-        layout.addWidget(self._key_input)
+        key_layout.addWidget(self._key_input)
 
         self._validation_lbl = QLabel("Only a verified Gemini key will be accepted.")
         self._validation_lbl.setWordWrap(True)
         self._validation_lbl.setFont(QFont("Arial", 8))
         self._validation_lbl.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
-        layout.addWidget(self._validation_lbl)
-        layout.addSpacing(8)
+        key_layout.addWidget(self._validation_lbl)
+        key_layout.addSpacing(4)
 
         self._remember_key = QPushButton("☆  Remember API key on this machine")
         self._remember_key.setFont(QFont("Courier New", 7))
@@ -4743,9 +4779,11 @@ class SetupOverlay(QWidget):
             }}
         """)
         self._remember_key.clicked.connect(self._toggle_remember_key)
-        layout.addWidget(self._remember_key)
+        key_layout.addWidget(self._remember_key)
 
-        layout.addSpacing(12)
+        layout.addWidget(self._key_section)
+
+        layout.addSpacing(6)
 
         sep2 = QFrame(); sep2.setFrameShape(QFrame.Shape.HLine)
         sep2.setStyleSheet(f"color: {C.BORDER};"); layout.addWidget(sep2)
@@ -4808,6 +4846,39 @@ class SetupOverlay(QWidget):
                     QPushButton:hover {{ color: {C.TEXT}; border: 1px solid {C.BORDER_B}; }}
                 """)
 
+    def _sel_provider(self, key: str):
+        self._selected_provider = key
+        pal = {"gemini": C.ENERGY, "ollama": C.GREEN, "openrouter": C.PRI}
+        for k, btn in self._prov_btns.items():
+            if k == key:
+                fg = pal.get(k, C.PRI)
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background: {fg}; color: {C.DARK};
+                        border: none; border-radius: 3px; font-weight: bold;
+                    }}
+                """)
+            else:
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background: {C.DARK}; color: {C.TEXT_DIM};
+                        border: 1px solid {C.BORDER}; border-radius: 3px;
+                    }}
+                    QPushButton:hover {{ color: {C.TEXT}; border: 1px solid {C.BORDER_B}; }}
+                """)
+        if key == "ollama":
+            self._key_section.hide()
+        else:
+            self._key_section.show()
+            if key == "gemini":
+                self._key_label.setText("GEMINI API KEY")
+                self._key_input.setPlaceholderText("Paste Gemini API key")
+                self._validation_lbl.setText("Only a verified Gemini key will be accepted.")
+            elif key == "openrouter":
+                self._key_label.setText("OPENROUTER API KEY")
+                self._key_input.setPlaceholderText("Paste OpenRouter API key")
+                self._validation_lbl.setText("Get a free key at openrouter.ai/keys")
+
     def _toggle_remember_key(self):
         # Simple visual toggle; actual persistence logic lives in _on_setup_done
         # in MainWindow.
@@ -4840,6 +4911,12 @@ class SetupOverlay(QWidget):
             """)
 
     def _submit(self):
+        provider = self._selected_provider
+        # Ollama needs no key
+        if provider == "ollama":
+            remember = bool(getattr(self, '_remember_enabled', False))
+            self.done.emit("", self._sel_os, remember)
+            return
         key = self._key_input.text().strip()
         if not key:
             self._key_input.setStyleSheet(
@@ -4847,6 +4924,13 @@ class SetupOverlay(QWidget):
             )
             return
         remember = bool(getattr(self, '_remember_enabled', False))
+        if provider == "openrouter":
+            # OpenRouter keys don't need Gemini validation
+            self._verified_key = key
+            self._validation_lbl.setText("OpenRouter key saved.")
+            self._validation_lbl.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
+            self.done.emit(key, self._sel_os, remember)
+            return
         self.validate_candidate(key, remember_key=remember)
 
     def validate_candidate(
@@ -8672,6 +8756,73 @@ class MainWindow(QMainWindow):
         self._overlay = ov
 
     def _on_setup_done(self, key: str, os_name: str, remember_key: bool):
+        provider = getattr(self._overlay, "_selected_provider", "gemini") if self._overlay else "gemini"
+
+        # For Ollama — no key needed
+        if provider == "ollama":
+            os.environ["MITSU_PROVIDER"] = "ollama"
+            os.makedirs(CONFIG_DIR, exist_ok=True)
+            try:
+                cfg = json.loads(API_FILE.read_text(encoding="utf-8")) if API_FILE.exists() else {}
+            except Exception:
+                cfg = {}
+            cfg["os_system"] = os_name
+            cfg["provider"] = "ollama"
+            API_FILE.write_text(json.dumps(cfg, indent=4), encoding="utf-8")
+            self._ready = True
+            if self._overlay:
+                self._overlay.hide()
+                self._overlay = None
+            self._apply_state("LISTENING")
+            self._log.append_log("SYS: INITIATING SYSTEMS, SIR...")
+            self._log.append_log("SYS: CORE SYSTEMS ONLINE")
+            self._log.append_log("SYS: NEURAL NETWORK ACTIVE  [OK]")
+            self._log.append_log("SYS: PARALLAX UI COMPLETE   [OK]")
+            self._log.append_log("SYS: VOICE SYNTHESIS READY  [OK]")
+            self._log.append_log(f"SYS: PLATFORM {os_name.upper()} DETECTED")
+            self._log.append_log("SYS: ALL SYSTEMS NOMINAL")
+            self._show_voice_select_then_name()
+            return
+
+        # For OpenRouter — save key directly
+        if provider == "openrouter":
+            if not key or not key.strip():
+                self._log.append_log("ERR: OpenRouter API key is empty.")
+                self._ready = False
+                return
+            os.environ["OPENROUTER_API_KEY"] = key.strip()
+            os.environ["MITSU_PROVIDER"] = "openrouter"
+            if remember_key:
+                try:
+                    store = get_secret_store()
+                    store.set("openrouter_api_key", key.strip())
+                    self._log.append_log("SYS: OpenRouter API key saved to OS keychain.")
+                except Exception as e:
+                    self._log.append_log(f"SYS: Could not save key to keychain: {e}")
+            os.makedirs(CONFIG_DIR, exist_ok=True)
+            try:
+                cfg = json.loads(API_FILE.read_text(encoding="utf-8")) if API_FILE.exists() else {}
+            except Exception:
+                cfg = {}
+            cfg["os_system"] = os_name
+            cfg["provider"] = "openrouter"
+            API_FILE.write_text(json.dumps(cfg, indent=4), encoding="utf-8")
+            self._ready = True
+            if self._overlay:
+                self._overlay.hide()
+                self._overlay = None
+            self._apply_state("LISTENING")
+            self._log.append_log("SYS: INITIATING SYSTEMS, SIR...")
+            self._log.append_log("SYS: CORE SYSTEMS ONLINE")
+            self._log.append_log("SYS: NEURAL NETWORK ACTIVE  [OK]")
+            self._log.append_log("SYS: PARALLAX UI COMPLETE   [OK]")
+            self._log.append_log("SYS: VOICE SYNTHESIS READY  [OK]")
+            self._log.append_log(f"SYS: PLATFORM {os_name.upper()} DETECTED")
+            self._log.append_log("SYS: ALL SYSTEMS NOMINAL")
+            self._show_voice_select_then_name()
+            return
+
+        # Gemini path (default)
         from core.api_key_validator import normalize_gemini_api_key
 
         normalized_key = normalize_gemini_api_key(key)
@@ -8682,7 +8833,6 @@ class MainWindow(QMainWindow):
             return
         key = normalized_key
 
-        # Persist API key only if user explicitly opts in.
         if remember_key and isinstance(key, str) and key.strip():
             try:
                 store = get_secret_store()
@@ -8697,16 +8847,14 @@ class MainWindow(QMainWindow):
             cfg = json.loads(API_FILE.read_text(encoding="utf-8")) if API_FILE.exists() else {}
         except Exception:
             cfg = {}
-        # Do NOT persist the Gemini API key to disk. Keep it in-memory for this session only.
         cfg.pop("gemini_api_key", None)
         cfg["os_system"] = os_name
+        cfg["provider"] = "gemini"
         API_FILE.write_text(json.dumps(cfg, indent=4), encoding="utf-8")
         try:
-            # Set the API key for this running process only. This ensures the key is
-            # available to modules that read `os.environ['GEMINI_API_KEY']` without
-            # writing it to disk — the user must re-enter it on next start.
             if isinstance(key, str) and key.strip():
                 os.environ["GEMINI_API_KEY"] = key.strip()
+                os.environ["MITSU_PROVIDER"] = "gemini"
                 self._log.append_log("SYS: Gemini API key set for this session (not saved).")
         except Exception:
             pass
@@ -8722,7 +8870,6 @@ class MainWindow(QMainWindow):
         self._log.append_log("SYS: VOICE SYNTHESIS READY  [OK]")
         self._log.append_log(f"SYS: PLATFORM {os_name.upper()} DETECTED")
         self._log.append_log("SYS: ALL SYSTEMS NOMINAL")
-        # After setup: show voice popup first, then name popup
         self._show_voice_select_then_name()
 
     def _check_and_show_name_signin(self):
