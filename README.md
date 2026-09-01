@@ -1,6 +1,6 @@
-# Mitsu
+# MITSU
 
-**A JARVIS alternative, better than JARVIS** — a custom AI desktop assistant with voice interaction, local AI support, full system control, and a sleek black & white aesthetic.
+**A JARVIS alternative, better than JARVIS** — a custom AI desktop assistant with voice interaction, local AI support, full system control, emotions, and a sleek black & white aesthetic.
 
 > Inspired by [JARVIS-OS](https://github.com/MAL19INDUSTRIES/JARVIS-OS-V.2), built and extended by [virat013S](https://github.com/virat013S).
 
@@ -11,6 +11,7 @@
 Mitsu is a locally-run AI assistant that can:
 
 - **Voice Chat** — real-time voice with Gemini Live, or text-based with local Gemma 3 1B
+- **Emotions & Expressions** — moods that change tone and voice (excited, chill, focused, playful, worried, proud, sleepy)
 - **Desktop Control** — open apps, volume, brightness, screenshots, window management
 - **Browser Automation** — search, click, fill forms, navigate, take screenshots
 - **Messaging** — iMessage, WhatsApp, Instagram, Discord integration
@@ -18,16 +19,31 @@ Mitsu is a locally-run AI assistant that can:
 - **Deep Research** — multi-source web research with background or visible mode
 - **Presentations** — create and edit PowerPoint decks
 - **Email** — Gmail integration with approval-gated sending
+- **Voice/Image/Video Recognition** — identify speakers, analyze images, OCR, video analysis
 - **Permission System** — sudo commands require user approval
 - **Black & White Noir Theme** — pure black canvas, white energy
 
-### Multi-Provider AI
+---
 
-| Mode | Description | Cost |
-|------|-------------|------|
-| **Local (Gemma 3 1B)** | Runs offline via Ollama, no API key needed | Free |
-| **Cloud (Gemini)** | Best voice quality, requires Google API key | Free tier available |
-| **OpenRouter** | Free tier models, needs internet | Free |
+## Requirements
+
+| Requirement | Details |
+|-------------|---------|
+| **Python** | 3.11 or higher |
+| **OS** | Linux, macOS, or Windows (WSL recommended) |
+| **RAM** | 4GB minimum, 8GB+ recommended |
+| **Disk** | ~2GB for dependencies + models |
+| **Internet** | Required for setup, Gemini, and OpenRouter modes |
+
+### Provider-Specific Requirements
+
+| Mode | Extra Requirements |
+|------|-------------------|
+| **Gemini (Cloud)** | Free API key from [Google AI Studio](https://aistudio.google.com/apikey) |
+| **Ollama (Local)** | [Ollama](https://ollama.com) installed + `gemma3:1b` model pulled |
+| **OpenRouter** | Free API key from [OpenRouter](https://openrouter.ai/keys) |
+
+> **IMPORTANT:** A Gemini API key is **always required** during setup, even if you plan to use Ollama or OpenRouter mode. The UI validates it on every startup. You can get a free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey) — it takes 30 seconds.
 
 ---
 
@@ -51,82 +67,63 @@ install.bat
 mitsu
 ```
 
-The installer will:
-1. Check Python 3.11+ is installed
-2. Create a virtual environment
-3. Install all dependencies
-4. Set up configuration
-5. Check if Ollama is available (for local mode)
-6. Install the `mitsu` CLI command
+### What the installer does:
+1. Checks Python 3.11+ is installed
+2. Creates a virtual environment (`.venv/`)
+3. Installs all dependencies (PyQt6, edge-tts, opencv, etc.)
+4. Sets up configuration files
+5. Installs the `mitsu` CLI command to `~/.local/bin/`
 
 ---
 
 ## Configuration
 
 On first launch, Mitsu will ask you:
-1. **What to call you** — your nickname
-2. **Which mode to use** — Cloud / Local / OpenRouter
+1. **Your name** — what Mitsu calls you
+2. **Provider mode** — Cloud (Gemini) / Local (Ollama) / OpenRouter
+3. **API keys** — based on your provider selection
 
-You can also configure manually by editing `.env`:
+### Manual Configuration (`.env`)
 
 ```env
 # Provider: gemini | ollama | openrouter
 MITSU_PROVIDER="ollama"
 
-# Gemini (for cloud mode)
-GEMINI_API_KEY="your-key-here"
+# Gemini API key (always required for setup)
+GEMINI_API_KEY="your-gemini-key-here"
 
-# Ollama (for local mode)
-OLLAMA_MODEL="gemma3:1b"
+# OpenRouter (free tier)
+OPENROUTER_API_KEY="your-openrouter-key-here"
 
-# OpenRouter (for free tier)
-OPENROUTER_API_KEY="your-key-here"
+# OpenRouter model (default: nvidia/nemotron-3-ultra-550b-a55b:free)
+OPENROUTER_MODEL="nvidia/nemotron-3-ultra-550b-a55b:free"
 ```
 
----
+### Provider Details
 
-## Local Mode Setup (Gemma 3 1B)
-
-Local mode runs entirely on your hardware — no API key, no internet needed.
-
-### Requirements
-- **RAM:** 2GB+ free
-- **CPU:** Any modern processor
-- **GPU:** Not required (runs on CPU)
-
-### Setup
-
-1. Install Ollama:
-   ```bash
-   curl -fsSL https://ollama.com/install.sh | sh
-   ```
-
-2. Pull the model:
-   ```bash
-   ollama pull gemma3:1b
-   ```
-
-3. Run Mitsu:
-   ```bash
-   mitsu
-   ```
-   Select "Local Mode" when prompted.
+| Mode | Model | Cost | Voice |
+|------|-------|------|-------|
+| **Gemini** | gemini-2.5-flash | Free tier available | Gemini Live (best quality) |
+| **Ollama** | gemma3:1b | Free, offline | edge-tts fallback |
+| **OpenRouter** | nvidia/nemotron-3-ultra-550b-a55b:free | Free | edge-tts fallback |
 
 ---
 
-## Cloud Mode Setup (Gemini)
+## Emotions & Expressions
 
-1. Get a free API key at [Google AI Studio](https://aistudio.google.com/apikey)
-2. Run `mitsu` and select "Cloud Mode"
-3. Paste your API key when prompted
+Mitsu has moods that affect how he speaks and responds:
 
----
+| Mood | Voice Change | When It Triggers |
+|------|-------------|------------------|
+| **Chill** | Normal speed | Default state |
+| **Excited** | Faster, higher pitch | User is excited, "!", "let's go" |
+| **Focused** | Normal speed | Task-oriented messages |
+| **Playful** | Slightly faster | Jokes, memes, fun talk |
+| **Worried** | Slower, lower | Errors, problems, stress |
+| **Proud** | Warm tone | Achievements, completions |
+| **Sleepy** | Slow, low | Late night (11pm-5am) |
 
-## OpenRouter Setup
-
-1. Get a free API key at [OpenRouter](https://openrouter.ai/keys)
-2. Run `mitsu` and select "OpenRouter"
-3. Paste your API key when prompted
+The emotions system detects your tone and adjusts Mitsu's text personality and voice parameters (pitch/speed) automatically.
 
 ---
 
@@ -136,6 +133,7 @@ Local mode runs entirely on your hardware — no API key, no internet needed.
 - Real-time voice with Gemini Live
 - **2-clap startup gate** — clap twice to activate (configurable)
 - Configurable voice names: puck, charon, kore, fenrir, aoede, leda, orus, schedar, zubenelgenubi
+- Edge-TTS fallback for Ollama/OpenRouter modes
 
 ### Desktop Control
 - Open/close applications
@@ -169,6 +167,11 @@ Local mode runs entirely on your hardware — no API key, no internet needed.
 - Approval-gated sending (never sends without your OK)
 - OAuth2 authentication
 
+### Recognition
+- **Voice:** Identify who is talking, save voice profiles
+- **Image:** Analyze images, detect faces, OCR text extraction
+- **Video:** Watch videos, describe scenes, extract key frames
+
 ### Permission System
 - Sudo commands require explicit user approval
 - All system actions are logged
@@ -178,16 +181,14 @@ Local mode runs entirely on your hardware — no API key, no internet needed.
 
 ## Mitsu Personality
 
-Mitsu isn't a cold machine — he's more like a sharp best friend who knows everything:
+Mitsu isn't a cold machine — he's like a sharp best friend who knows everything:
 
 - **Friendly & witty** — makes occasional clever jokes
 - **Calls you by name** — remembers your nickname
 - **Adapts to context** — casual for chat, professional for work
+- **Emotionally aware** — matches your energy, calms you down, hypes you up
 - **Protective** — warns about issues, protects your privacy
 - **Proactive** — suggests improvements, celebrates wins
-
-On startup, Mitsu greets you:
-> "Welcome back, Virat! What are we getting into today?"
 
 ---
 
@@ -201,10 +202,13 @@ mitsu/
 ├── install.bat          # Windows installer
 ├── .env.example         # Configuration template
 ├── core/
-│   ├── mitsu_client.py  # Client protocol
+│   ├── emotions.py      # Mood detection & voice expression
 │   ├── providers.py     # Multi-provider backend (Gemini/Ollama/OpenRouter)
 │   ├── permissions.py   # Sudo permission system
-│   └── prompt.txt       # Mitsu personality definition
+│   ├── recognition.py   # Voice/Image/Video analysis
+│   ├── skills.py        # Built-in skills (calculator, web, code, etc.)
+│   ├── prompt.txt       # Mitsu personality definition
+│   └── llm.py           # LLM abstraction layer
 ├── actions/             # 27 action modules (browser, files, email, etc.)
 ├── agent/               # Task planner & executor
 ├── api/                 # FastAPI web backend
@@ -227,9 +231,7 @@ mitsu/
 
 ---
 
-## Commands
-
-Mitsu responds to natural language. Examples:
+## Example Commands
 
 - "Open Spotify"
 - "What's the weather in Tokyo?"
@@ -239,6 +241,32 @@ Mitsu responds to natural language. Examples:
 - "What files are on my desktop?"
 - "Set a reminder for tomorrow at 3pm"
 - "Take a screenshot"
+- "Read this image" (with image attached)
+- "Who is talking?" (with audio attached)
+
+---
+
+## Troubleshooting
+
+### "Gemini API key error" on startup
+- A Gemini API key is **always required** during setup validation
+- Get a free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+- The key is validated on every startup, even for Ollama/OpenRouter modes
+
+### Voice not working
+- Install edge-tts: `pip install edge-tts`
+- Install mpv: `sudo pacman -S mpv` (Arch) / `brew install mpv` (macOS)
+- Check edge-tts is in PATH: `which edge-tts`
+
+### Ollama not connecting
+- Make sure Ollama is running: `ollama serve`
+- Pull the model: `ollama pull gemma3:1b`
+- Check status: `ollama list`
+
+### UI lagging
+- Close other heavy applications
+- Try Ollama mode (lighter on resources)
+- Check RAM usage: `free -h`
 
 ---
 
