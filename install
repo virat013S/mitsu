@@ -1,0 +1,181 @@
+#!/usr/bin/env bash
+# ──────────────────────────────────────────────────────────────────────────────
+# Mitsu Installer — one command to set up everything
+# Works on Linux, macOS, and WSL
+# ──────────────────────────────────────────────────────────────────────────────
+set -e
+
+# Resolve project root from script location
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+PROJECT_ROOT="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+cd "$PROJECT_ROOT"
+
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+
+echo ""
+echo "  ╔═══════════════════════════════════════════════╗"
+echo "  ║                                               ║"
+echo "  ║   ███╗   ███╗███████╗███████╗████████╗██╗███╗ ██╗██╗  ██╗"
+echo "  ║   ████╗ ████║██╔════╝██╔════╝╚══██╔══╝██║████╗██║██║  ██║"
+echo "  ║   ██╔████╔██║█████╗  ███████╗   ██║   ██║██╔██╗██║███████║"
+echo "  ║   ██║╚██╔╝██║██╔══╝  ╚════██║   ██║   ██║██║╚████║╚════██║"
+echo "  ║   ██║ ╚═╝ ██║███████╗███████║   ██║   ██║██║ ╚███║     ██║"
+echo "  ║   ╚═╝     ╚═╝╚══════╝╚══════╝   ╚═╝   ╚═╝╚═╝  ╚══╝     ╚═╝"
+echo "  ║                                               ║"
+echo "  ║        Your Custom AI Assistant               ║"
+echo "  ║           by virat013S                       ║"
+echo "  ║                                               ║"
+echo "  ╚═══════════════════════════════════════════════╝"
+echo ""
+
+# ── Step 1: Check Python ────────────────────────────────────────────────────
+echo "  [1/6] Checking Python..."
+if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+  echo "  ❌ Python 3 is required. Install from https://www.python.org/downloads/"
+  exit 1
+fi
+
+PY_VERSION=$("$PYTHON_BIN" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+PY_MAJOR=$("$PYTHON_BIN" -c "import sys; print(sys.version_info.major)")
+PY_MINOR=$("$PYTHON_BIN" -c "import sys; print(sys.version_info.minor)")
+
+if [ "$PY_MAJOR" -lt 3 ] || ([ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 11 ]); then
+  echo "  ❌ Python 3.11+ required (found $PY_VERSION)"
+  exit 1
+fi
+echo "  ✅ Python $PY_VERSION"
+
+# ── Step 1.5: Check system deps ────────────────────────────────────────────
+echo "  Checking system dependencies..."
+if command -v apt-get >/dev/null 2>&1; then
+  # Debian/Ubuntu
+  if ! dpkg -l | grep -q "portaudio19-dev" 2>/dev/null; then
+    echo "    Installing portaudio for pyaudio..."
+    sudo apt-get install -y portaudio19-dev >/dev/null 2>&1 || true
+  fi
+elif command -v pacman >/dev/null 2>&1; then
+  # Arch
+  if ! pacman -Qi portaudio >/dev/null 2>&1; then
+    echo "    Installing portaudio for pyaudio..."
+    sudo pacman -S --noconfirm portaudio >/dev/null 2>&1 || true
+  fi
+fi
+
+# ── Step 2: Create virtual environment ──────────────────────────────────────
+echo "  [2/6] Setting up virtual environment..."
+if [ ! -x ".venv/bin/python" ]; then
+  "$PYTHON_BIN" -m venv .venv
+  echo "  ✅ Created .venv"
+else
+  echo "  ✅ .venv already exists"
+fi
+
+# ── Step 3: Install dependencies ────────────────────────────────────────────
+echo "  [3/6] Installing dependencies (this may take a few minutes)..."
+".venv/bin/python" -m pip install --upgrade pip --quiet >/dev/null 2>&1
+
+# Install in batches to avoid hanging on one package
+CORE_DEPS="requests beautifulsoup4 psutil pyperclip send2trash keyring cryptography"
+AI_DEPS="google-genai google-generativeai google-api-python-client google-auth-httplib2 google-auth-oauthlib duckduckgo-search elevenlabs openai edge-tts"
+LOCAL_DEPS="numpy opencv-python Pillow pandas mss sounddevice soundfile SpeechRecognition"
+UI_DEPS="pyqt6 python-docx openpyxl python-pptx PyMuPDF"
+WEB_DEPS="fastapi uvicorn[standard] playwright youtube-transcript-api xlrd"
+DATA_DEPS="SQLAlchemy>=2.0,<3 alembic>=1.13,<2 psycopg[binary]>=3.2,<4 redis>=5,<7 email-validator>=2.2,<3"
+
+for batch_name in "Core" "AI/Cloud" "Local ML" "UI/Documents" "Web/API" "Database"; do
+  case $batch_name in
+    "Core")     deps="$CORE_DEPS" ;;
+    "AI/Cloud") deps="$AI_DEPS" ;;
+    "Local ML") deps="$LOCAL_DEPS" ;;
+    "UI/Documents") deps="$UI_DEPS" ;;
+    "Web/API")  deps="$WEB_DEPS" ;;
+    "Database") deps="$DATA_DEPS" ;;
+  esac
+  echo "    Installing $batch_name..."
+  timeout 120 ".venv/bin/python" -m pip install $deps --quiet --progress-bar off 2>/dev/null || {
+    echo "    ⚠️  Some $batch_name packages may have failed — run 'pip install $deps' manually if needed"
+  }
+done
+
+echo "  ✅ Dependencies installed"
+
+# ── Step 4: Setup .env ─────────────────────────────────────────────────────
+echo "  [4/6] Setting up configuration..."
+if [ ! -f ".env" ]; then
+  cp .env.example .env
+  echo "  ✅ Created .env from template"
+else
+  echo "  ✅ .env already exists (keeping current)"
+fi
+
+# ── Step 5: Check Ollama (optional) ────────────────────────────────────────
+echo "  [5/6] Checking Ollama..."
+if command -v ollama >/dev/null 2>&1; then
+  if curl -s http://localhost:11434/api/tags >/dev/null 2>&1; then
+    echo "  ✅ Ollama is running"
+    # Check if gemma3:1b is installed
+    if ollama list 2>/dev/null | grep -q "gemma3:1b"; then
+      echo "  ✅ gemma3:1b is ready"
+    else
+      echo "  ⚠️  gemma3:1b not found. To use local mode, run:"
+      echo "     ollama pull gemma3:1b"
+    fi
+  else
+    echo "  ⚠️  Ollama installed but not running. Start with: ollama serve"
+  fi
+else
+  echo "  ℹ️  Ollama not installed. For local mode, install it:"
+  echo "     curl -fsSL https://ollama.com/install.sh | sh"
+fi
+
+# ── Step 6: Install CLI ────────────────────────────────────────────────────
+echo "  [6/6] Installing mitsu CLI..."
+INSTALL_DIR="${MITSU_INSTALL_DIR:-$HOME/.local/bin}"
+mkdir -p "$INSTALL_DIR"
+ln -sfn "$PROJECT_ROOT/scripts/mitsu" "$INSTALL_DIR/mitsu"
+chmod +x "$PROJECT_ROOT/scripts/mitsu"
+
+# Add to PATH if needed
+PROFILE=""
+if [ "$(basename "${SHELL:-}")" = "zsh" ]; then
+  PROFILE="$HOME/.zprofile"
+elif [ "$(basename "${SHELL:-}")" = "bash" ]; then
+  PROFILE="$HOME/.bash_profile"
+fi
+if [ -z "$PROFILE" ]; then
+  PROFILE="$HOME/.profile"
+fi
+
+if ! grep -Fq 'MITSU_INSTALL_DIR' "$PROFILE" 2>/dev/null; then
+  if printf '\n# Mitsu CLI\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$PROFILE" 2>/dev/null; then
+    echo "  ✅ Added ~/.local/bin to PATH in $PROFILE"
+  else
+    echo "  ⚠️  Could not update $PROFILE — add $INSTALL_DIR to PATH manually"
+  fi
+else
+  echo "  ✅ PATH already configured"
+fi
+
+echo "  ✅ Installed: $INSTALL_DIR/mitsu"
+
+# ── Done ────────────────────────────────────────────────────────────────────
+echo ""
+echo "  ╔═══════════════════════════════════════════════╗"
+echo "  ║           Setup complete!                     ║"
+echo "  ╠═══════════════════════════════════════════════╣"
+echo "  ║                                               ║"
+echo "  ║  1. Configure your API key in .env            ║"
+echo "  ║     (or use local mode — no key needed)       ║"
+echo "  ║                                               ║"
+echo "  ║  2. Run:  source ~/.bash_profile              ║"
+echo "  ║     (or open a new terminal)                  ║"
+echo "  ║                                               ║"
+echo "  ║  3. Run:  mitsu                               ║"
+echo "  ║                                               ║"
+echo "  ╚═══════════════════════════════════════════════╝"
+echo ""
