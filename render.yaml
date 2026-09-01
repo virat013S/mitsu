@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: mitsu-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    preDeployCommand: alembic upgrade head
+    envVars:
+      - key: MITSU_ENV
+        value: production
+      - key: AUTO_CREATE_TABLES
+        value: "0"
+      - key: REDIS_REQUIRED
+        value: "1"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mitsu-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: mitsu-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MITSU_ENCRYPTION_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false
+  - type: keyvalue
+    name: mitsu-redis
+    ipAllowList: []
+    plan: starter
+
+databases:
+  - name: mitsu-postgres
+    plan: basic-256mb
+    databaseName: mitsu
+    user: mitsu
