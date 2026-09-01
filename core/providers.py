@@ -163,17 +163,28 @@ def execute_skill_calls(text: str) -> tuple[str, list[dict]]:
 
 # ── Voice / TTS ─────────────────────────────────────────────────────────────
 
-def _tts_edge(text: str, voice: str = "en-US-AriaNeural") -> bool:
+def _tts_edge(text: str, voice: str = "en-US-AriaNeural", pitch: str = "+0Hz", rate: str = "+0%") -> bool:
     """Generate speech using edge-tts (free, no API key). Returns True if played."""
     try:
-        import subprocess, tempfile, os
+        import subprocess, tempfile, os, shutil
         tmp = tempfile.mktemp(suffix=".mp3")
-        proc = subprocess.run(
-            ["edge-tts", "--voice", voice, "--text", text, "--write-media", tmp],
-            capture_output=True, timeout=30,
-        )
+        # Find edge-tts binary — check venv first, then PATH
+        edge_bin = shutil.which("edge-tts")
+        if not edge_bin:
+            venv_bin = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".venv", "bin", "edge-tts")
+            if os.path.isfile(venv_bin):
+                edge_bin = venv_bin
+        if not edge_bin:
+            return False
+        cmd = [edge_bin, "--voice", voice, "--text", text, "--write-media", tmp]
+        if pitch and pitch != "+0Hz":
+            cmd.extend(["--pitch", pitch])
+        if rate and rate != "+0%":
+            cmd.extend(["--rate", rate])
+        proc = subprocess.run(cmd, capture_output=True, timeout=30)
         if proc.returncode == 0 and os.path.exists(tmp):
-            subprocess.run(["mpv", "--no-video", tmp], capture_output=True, timeout=60)
+            mpv_bin = shutil.which("mpv") or "mpv"
+            subprocess.run([mpv_bin, "--no-video", tmp], capture_output=True, timeout=60)
             os.unlink(tmp)
             return True
     except Exception:
@@ -181,13 +192,19 @@ def _tts_edge(text: str, voice: str = "en-US-AriaNeural") -> bool:
     return False
 
 
-def speak(text: str, voice: str | None = None) -> bool:
+def speak(text: str, voice: str | None = None, mood_data: dict | None = None) -> bool:
     """Speak text using available TTS. Returns True if spoken."""
     if not text or not text.strip():
         return False
+    # Apply mood voice params
+    pitch = "+0Hz"
+    rate = "+0%"
+    if mood_data:
+        pitch = mood_data.get("pitch", "+0Hz")
+        rate = mood_data.get("rate", "+0%")
     # Try edge-tts first (free, works everywhere)
     edge_voice = voice or "en-US-AriaNeural"
-    if _tts_edge(text, edge_voice):
+    if _tts_edge(text, edge_voice, pitch=pitch, rate=rate):
         return True
     # Fallback: try system espeak
     try:

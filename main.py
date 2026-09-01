@@ -1176,10 +1176,16 @@ class MitsuLive:
         self._self_quit_timer = None
         self._shutdown_requested = threading.Event()
         self._tour_active = False
+        self._current_mood = "chill"
 
     def _on_text_command(self, text: str):
         if not self._loop or not self.session:
             return
+        try:
+            from core.emotions import detect_user_tone
+            self._current_mood = detect_user_tone(text)
+        except Exception:
+            pass
         asyncio.run_coroutine_threadsafe(self.send_text(text), self._loop)
 
     async def send_text(self, text: str) -> bool:
