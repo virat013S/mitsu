@@ -21,9 +21,9 @@ android.minapi = 21
 android.ndk = 25b
 android.sdk = 33
 
-# Build for ALL architectures to support every device
-android.archs = arm64-v8a, armeabi-v7a, x86, x86_64
-android.enable_split = True
+# Build for arm64 (most modern phones including Vivo/OriginOS)
+android.archs = arm64-v8a
+android.enable_split = False
 
 # Gradle dependencies (for Android-specific features)
 android.gradle_dependencies = com.google.android.gms:play-services-speech:19.0.1,com.google.android.gms:play-services-location:21.0.1,com.google.android.gms:play-services-vision:20.1.3

@@ -1,0 +1,158 @@
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/obj/local/arm64-v8a/objs-debug/SDL2_image/src/IMG_bmp.o: \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL2_image/src/IMG_bmp.c \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL2_image/include/SDL_image.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_main.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_stdinc.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_config.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_platform.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/begin_code.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/close_code.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_config_android.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_assert.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_atomic.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_audio.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_error.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_endian.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_mutex.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_thread.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_rwops.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_clipboard.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_cpuinfo.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_events.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_video.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_pixels.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_rect.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_surface.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_blendmode.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_keyboard.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_keycode.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_scancode.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_mouse.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_joystick.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_guid.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_gamecontroller.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_sensor.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_quit.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_gesture.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_touch.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_filesystem.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_haptic.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_hidapi.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_hints.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_loadso.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_log.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_messagebox.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_metal.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_power.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_render.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_shape.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_system.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_timer.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_version.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_locale.h \
+  /home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_misc.h
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL2_image/include/SDL_image.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_main.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_stdinc.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_config.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_platform.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/begin_code.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/close_code.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_config_android.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_assert.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_atomic.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_audio.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_error.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_endian.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_mutex.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_thread.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_rwops.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_clipboard.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_cpuinfo.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_events.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_video.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_pixels.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_rect.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_surface.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_blendmode.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_keyboard.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_keycode.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_scancode.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_mouse.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_joystick.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_guid.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_gamecontroller.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_sensor.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_quit.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_gesture.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_touch.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_filesystem.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_haptic.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_hidapi.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_hints.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_loadso.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_log.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_messagebox.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_metal.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_power.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_render.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_shape.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_system.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_timer.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_version.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_locale.h:
+
+/home/mitsuki/mitsu/android/.buildozer/android/platform/build-arm64-v8a/build/bootstrap_builds/sdl2/jni/SDL/include/SDL_misc.h:

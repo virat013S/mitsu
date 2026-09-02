@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mitsu-assistant"
 version = "0.1.0"
-description = "Mitsu — custom AI desktop assistant, a JARVIS alternative with local Gemma 3 1B support"
+description = "Mitsu — custom AI desktop assistant with local Gemma 3 1B support"
 requires-python = ">=3.11"
 
 [project.scripts]

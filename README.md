@@ -1,8 +1,8 @@
 # MITSU
 
-**A JARVIS alternative, better than JARVIS** — your own AI desktop assistant that actually feels like a friend. Voice chat, desktop control, browser automation, deep research, emotions, auto-theming, and a slick noir aesthetic.
+**Your own AI assistant that actually feels like a friend.** Voice chat, desktop control, browser automation, deep research, emotions, auto-theming, and a slick noir aesthetic.
 
-> Inspired by [JARVIS-OS](https://github.com/MAL19INDUSTRIES/JARVIS-OS-V.2), built and extended by [virat013S](https://github.com/virat013S).
+> Built by [virat013S](https://github.com/virat013S).
 
 ---
 
@@ -420,7 +420,7 @@ pip install -r requirements.txt
 `#mitsu` `#aiassistant` `#python` `#voiceassistant` `#ollama` `#gemini` `#localai` `#opensource` `#coding` `#pyqt6` `#desktopapp` `#texttospeech` `#chatbot` `#artificialintelligence` `#machinelearning` `#devtools` `#tech` `#software` `#programming` `#developer` `#open-source` `#selfhosted` `#privacy` `#automation`
 
 **Instagram/YouTube/TikTok:**
-`#codingtok` `#pythonproject` `#aiproject` `#buildwithme` `#tech` `#learnpython` `#coding` `#developer` `#ai` `#robot` `#jarvis` `#ironman` `#techtok` `#learntocode` `#programming` `#cyber` `#cybersecurity` `#digital` `#techlife` `#futuretech` `#smarthome` `#personalassistant` `#moodthemes` `#emotionai`
+`#codingtok` `#pythonproject` `#aiproject` `#buildwithme` `#tech` `#learnpython` `#coding` `#developer` `#ai` `#robot` `#techtok` `#learntocode` `#programming` `#cyber` `#cybersecurity` `#digital` `#techlife` `#futuretech` `#smarthome` `#personalassistant` `#moodthemes` `#emotionai`
 
 **Reddit:**
 - r/Python — share the code and features
@@ -440,8 +440,7 @@ pip install -r requirements.txt
 
 ## Credits
 
-- **Inspired by:** [JARVIS-OS](https://github.com/MAL19INDUSTRIES/JARVIS-OS-V.2) — the OG JARVIS project
-- **Built by:** [virat013S](https://github.com/virat013S) — a 13-year-old who wanted a better AI assistant
+- **Built by:** [virat013S](https://github.com/virat013S)
 - **License:** MIT — do whatever you want with it
 
 ---
@@ -685,7 +684,7 @@ If you think Mitsu is cool, spread the word! Here are some hashtags you can use:
 #programming #developer #open-source #selfhosted #privacy #automation 
 #linux #macos #windows #android #mobileapp #kivy #buildozer 
 #cyber #digital #techlife #futuretech #smarthome #personalassistant 
-#jarvis #ironman #sci-fi #aibuddy #moodthemes #emotionai
+#aibuddy #moodthemes #emotionai
 ```
 
 **Star the repo:** https://github.com/virat013S/mitsu
