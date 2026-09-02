@@ -1177,10 +1177,14 @@ class MitsuLive:
         self._shutdown_requested = threading.Event()
         self._tour_active = False
         self._current_mood = "chill"
+        self._last_user_input_at = time.monotonic()
+        self._proactive_timer = None
 
     def _on_text_command(self, text: str):
         if not self._loop or not self.session:
             return
+        # Track user input for proactive messaging
+        self._on_user_input()
         try:
             from core.emotions import detect_user_tone, get_theme_for_mood
             self._current_mood = detect_user_tone(text)
@@ -1189,6 +1193,68 @@ class MitsuLive:
         except Exception:
             pass
         asyncio.run_coroutine_threadsafe(self.send_text(text), self._loop)
+
+    def _on_user_input(self):
+        """Track when user last spoke for proactive messaging."""
+        self._last_user_input_at = time.monotonic()
+
+    def _start_proactive_timer(self):
+        """Start a timer that checks if Mitsu should say something proactively."""
+        if self._proactive_timer:
+            self._proactive_timer.cancel()
+        # Check every 3-5 minutes (randomized to feel natural)
+        interval = random.randint(180, 300)
+        self._proactive_timer = threading.Timer(interval, self._maybe_proactive_message)
+        self._proactive_timer.daemon = True
+        self._proactive_timer.start()
+
+    def _maybe_proactive_message(self):
+        """Possibly send a proactive message if user has been quiet."""
+        if not self._loop or not self.session:
+            return
+        try:
+            from core.emotions import should_be_proactive, get_proactive_message, get_casual_topic
+            # Only if user has been quiet for 5+ minutes
+            quiet_time = time.monotonic() - self._last_user_input_at
+            if quiet_time < 300:
+                self._start_proactive_timer()
+                return
+            # Random chance to speak
+            if not should_be_proactive():
+                self._start_proactive_timer()
+                return
+            # Get username from memory
+            memory = load_memory()
+            name_entry = memory.get("identity", {}).get("name")
+            name = None
+            if isinstance(name_entry, dict):
+                name = name_entry.get("value")
+            elif isinstance(name_entry, str):
+                name = name_entry
+            display_name = name or "friend"
+            # 50/50 chance: proactive check-in or casual topic
+            if random.random() < 0.5:
+                msg = get_proactive_message(self._current_mood, display_name)
+            else:
+                msg = get_casual_topic(display_name)
+            # Send the proactive message
+            asyncio.run_coroutine_threadsafe(self.send_proactive(msg), self._loop)
+        except Exception:
+            pass
+        finally:
+            self._start_proactive_timer()
+
+    async def send_proactive(self, text: str):
+        """Send a proactive message from Mitsu to the user."""
+        if not self.session:
+            return
+        try:
+            await self.session.send_client_content(
+                turns={"parts": [{"text": text}]},
+                turn_complete=True,
+            )
+        except Exception:
+            pass
 
     async def send_text(self, text: str) -> bool:
         """Send a text turn from either the desktop callback or a web client."""
@@ -2031,6 +2097,8 @@ class MitsuLive:
                     tg.create_task(self._receive_audio())
                     tg.create_task(self._play_audio())
                     tg.create_task(self._announce_startup())
+                    # Start proactive messaging timer
+                    self._start_proactive_timer()
 
             except Exception as e:
                 if self._shutdown_requested.is_set():

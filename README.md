@@ -1,6 +1,6 @@
 # MITSU
 
-**A JARVIS alternative, better than JARVIS** — your own AI desktop assistant that actually feels like a friend. Voice chat, desktop control, browser automation, deep research, emotions, and a slick black & white theme.
+**A JARVIS alternative, better than JARVIS** — your own AI desktop assistant that actually feels like a friend. Voice chat, desktop control, browser automation, deep research, emotions, auto-theming, and a slick noir aesthetic.
 
 > Inspired by [JARVIS-OS](https://github.com/MAL19INDUSTRIES/JARVIS-OS-V.2), built and extended by [virat013S](https://github.com/virat013S).
 
@@ -14,6 +14,11 @@ Mitsu is a custom AI assistant that runs on YOUR machine. Not some cloud-only th
 
 - **Talk to it** — real-time voice chat via Gemini Live, or text chat with local AI
 - **Has emotions** — gets excited when you're excited, chills when it's late, hypes you up when you accomplish something
+- **Auto-themes** — UI color changes automatically based on your mood (blue for excited, red for focused, purple for playful, gold for worried)
+- **Time-aware** — asks about lunch, sleep, how your day was based on system time
+- **Gender support** — respects your preferred pronouns and casual terms (bro/sis/bestie)
+- **Proactive messaging** — sometimes says things on its own when you're quiet, checks in on you
+- **Casual friend mode** — talks about crushes, music, dreams, random topics — your AI wingman
 - **Controls your desktop** — opens apps, adjusts volume/brightness, takes screenshots, manages windows
 - **Browses the web** — searches, clicks, fills forms, navigates pages, takes screenshots
 - **Manages files** — create, read, write, delete, organize, find anything on your system
@@ -134,6 +139,16 @@ Pick your mode, paste your API key (if needed), and you're good to go.
 
 **After first setup**, Mitsu remembers your provider. Next time you just run `mitsu` and it starts right up.
 
+### Setting Your Gender
+
+After setup, tell Mitsu your preferred gender for personalized pronouns and casual terms:
+
+- "I'm a guy" / "I'm male" → Mitsu uses he/him and terms like "bro", "dude", "king"
+- "I'm a girl" / "I'm female" → Mitsu uses she/her and terms like "sis", "queen", "bestie"
+- "I'm non-binary" / "neutral" → Mitsu uses they/them and terms like "friend", "pal", "legend"
+
+Or set it in Settings > Identity > Gender.
+
 ---
 
 ## Provider Details
@@ -161,21 +176,58 @@ Pick your mode, paste your API key (if needed), and you're good to go.
 
 ---
 
-## Emotions & Expressions
+## Emotions & Auto-Theming
 
-Mitsu isn't a robot — he has moods. They change how he talks and how his voice sounds:
+Mitsu isn't a robot — he has moods. They change how he talks, how his voice sounds, AND the UI colors:
 
-| Mood | What Happens | When |
-|------|-------------|------|
-| **Chill** | Relaxed tone, normal voice | Default state |
-| **Excited** | Faster voice, higher pitch, hype energy | You say "!", "let's go", "omg" |
-| **Focused** | Precise, task-mode, no fluff | Work tasks, coding, commands |
-| **Playful** | Teasing, funny, slightly faster | Jokes, memes, fun conversations |
-| **Worried** | Cautious, slower, lower pitch | Errors, problems, stress |
-| **Proud** | Warm, celebrating, normal speed | You finish something, achievements |
-| **Sleepy** | Slow, drowsy, low pitch | Late night (11pm-5am) |
+| Mood | Voice | UI Theme | When |
+|------|-------|----------|------|
+| **Chill** | Relaxed, normal | Mitsu Noir (black & white) | Default state |
+| **Excited** | Faster, higher pitch | Arc Reactor (electric blue) | You say "!", "let's go", "omg" |
+| **Focused** | Precise, no fluff | Stealth Red (intense red) | Work tasks, coding, commands |
+| **Playful** | Teasing, slightly faster | Vibranium Purple (fun purple) | Jokes, memes, fun conversations |
+| **Worried** | Cautious, slower | Nanotech Gold (alert gold) | Errors, problems, stress |
+| **Proud** | Warm, celebrating | Platinum White (light, airy) | You finish something, achievements |
+| **Sleepy** | Slow, drowsy | Mitsu Noir (dimmed) | Late night (11pm-5am) |
 
-The system detects your tone from what you type and adjusts automatically. Type "LET'S GO" and Mitsu matches your energy. Mention something's broken and he gets focused and helpful.
+The system detects your tone from what you type and adjusts automatically. The UI theme switches in real-time to match your mood.
+
+### Time-Aware Greetings
+
+Mitsu knows what time it is and acts accordingly:
+
+| Time | What Mitsu Says |
+|------|----------------|
+| **5-8 AM** | "Early bird huh? Did you sleep well?" |
+| **8-12 PM** | "Good morning! Did you eat breakfast?" |
+| **12-5 PM** | "Hey! Did you have lunch?" |
+| **5-9 PM** | "Good evening! How was your day?" |
+| **9-11 PM** | "Still going huh? Getting late..." |
+| **11 PM-5 AM** | "It's really late... you should be sleeping" |
+
+### Proactive Messaging
+
+Mitsu doesn't just wait for you to talk. He'll:
+- Check in if you've been quiet for a while
+- Share random fun facts
+- Ask about your day, your crush, your music
+- Remind you to take breaks, eat, sleep
+- Start casual conversations on his own
+
+Example: *"hey, you've been quiet for a bit. everything good?"*
+
+---
+
+## Casual Friend Mode
+
+Mitsu is your AI wingman. He talks about:
+- **Crushes** — "so... anyone special in your life? 👀"
+- **Food** — "important question — pizza or burgers?"
+- **Music** — "what are you listening to lately?"
+- **Dreams** — "what's something you've always wanted to do?"
+- **Random** — "if you could time travel would you go to past or future?"
+
+He uses gender-appropriate terms (bro/sis/bestie) and has genuine conversations, not just task responses.
 
 ---
 
@@ -186,6 +238,7 @@ The system detects your tone from what you type and adjusts automatically. Type 
 | `Ctrl+Space` | Push-to-talk (hold to speak) |
 | `Escape` | Cancel current action |
 | `Ctrl+Q` | Quit Mitsu |
+| `Ctrl+Shift+T` | Cycle through themes |
 
 ---
 
@@ -197,7 +250,6 @@ Literally anything, but here are some examples:
 - "Open Spotify"
 - "What's the weather in Tokyo?"
 - "Set a reminder for tomorrow at 3pm"
-- "What time is it?"
 
 **Desktop Control:**
 - "Take a screenshot"
@@ -230,19 +282,26 @@ Literally anything, but here are some examples:
 - "What's in this image?" (with image)
 - "Watch this video and tell me what happens" (with video)
 
+**Casual Chat:**
+- "Got any crushes?" (Mitsu asks YOU)
+- "Tell me a joke"
+- "What's a fun fact?"
+- "I'm bored"
+- "How's your day?"
+
 ---
 
 ## Project Structure
 
 ```
 mitsu/
-├── main.py              # Entry point, live engine, startup menu
+├── main.py              # Entry point, live engine, startup menu, proactive messaging
 ├── ui.py                # PyQt6 interface (9000+ lines of goodness)
 ├── install              # One-command installer (Linux/macOS)
 ├── install.bat          # Windows installer
 ├── .env.example         # Configuration template
 ├── core/
-│   ├── emotions.py      # Mood detection & voice expression
+│   ├── emotions.py      # Mood detection, voice expression, auto-theming, gender, proactive chat
 │   ├── providers.py     # Multi-provider backend (Gemini/Ollama/OpenRouter)
 │   ├── permissions.py   # Sudo permission system
 │   ├── recognition.py   # Voice/Image/Video analysis
@@ -264,7 +323,8 @@ mitsu/
 ├── memory/              # Long-term memory system
 ├── scripts/             # Setup & CLI scripts
 ├── tests/               # Test suite
-└── assets/              # Fonts, images
+├── assets/              # Fonts, images
+└── android/             # Android version (Kivy + Buildozer)
 ```
 
 ---
@@ -347,6 +407,34 @@ pip install -r requirements.txt
 - **Switch providers:** Delete `~/.mitsu/provider.json` and restart to reconfigure
 - **Custom voice:** Edit the voice name in settings — try different voices like "kore" or "charon"
 - **Late night mode:** Mitsu gets sleepy and speaks softer after 11pm
+- **Auto-themes:** Watch the UI change colors as your mood shifts
+- **Be casual:** Mitsu responds better to natural conversation, not robotic commands
+
+---
+
+## Sharing & Community
+
+### Hashtags for Social Media
+
+**GitHub/Twitter/X:**
+`#mitsu` `#aiassistant` `#python` `#voiceassistant` `#ollama` `#gemini` `#localai` `#opensource` `#coding` `#pyqt6` `#desktopapp` `#texttospeech` `#chatbot` `#artificialintelligence` `#machinelearning` `#devtools` `#tech` `#software` `#programming` `#developer` `#open-source` `#selfhosted` `#privacy` `#automation`
+
+**Instagram/YouTube/TikTok:**
+`#codingtok` `#pythonproject` `#aiproject` `#buildwithme` `#tech` `#learnpython` `#coding` `#developer` `#ai` `#robot` `#jarvis` `#ironman` `#techtok` `#learntocode` `#programming` `#cyber` `#cybersecurity` `#digital` `#techlife` `#futuretech` `#smarthome` `#personalassistant` `#moodthemes` `#emotionai`
+
+**Reddit:**
+- r/Python — share the code and features
+- r/opensource — community-driven project
+- r/selfhosted — local-first AI assistant
+- r/LocalLLaMA — Ollama integration
+
+### Demo Video Ideas
+
+1. **Mood switching demo** — show UI changing colors as you type different emotions
+2. **Time-aware greeting** — record at different times of day
+3. **Casual conversation** — show Mitsu asking about crushes, music, etc.
+4. **Proactive messaging** — show Mitsu checking in on its own
+5. **Full feature tour** — voice, desktop control, file management, research
 
 ---
 
@@ -374,6 +462,8 @@ Want to make Mitsu better? Here's how:
 - More voice options
 - Better themes
 - Bug fixes
+- New casual conversation topics
+- Better proactive messaging patterns
 
 ---
 
@@ -381,6 +471,28 @@ Want to make Mitsu better? Here's how:
 
 - **Issues:** [Open an issue](https://github.com/virat013S/mitsu/issues) on GitHub
 - **Star the repo** if you like it — it helps a lot!
+
+---
+
+## Changelog
+
+### v2.1.0 (Latest)
+- **Auto-theming** — UI colors change based on your mood (7 themes: noir, arc reactor, stealth red, vibranium purple, nanotech gold, platinum)
+- **Time-aware greetings** — Mitsu asks about lunch, sleep, how your day was
+- **Gender support** — respects your preferred pronouns and casual terms (bro/sis/bestie)
+- **Proactive messaging** — Mitsu talks on its own when you're quiet, checks in on you
+- **Casual friend mode** — talks about crushes, music, dreams, random topics
+- **Updated personality** — more friendly, more casual, more human
+
+### v2.0.0
+- Android version — full Kivy app with Buildozer APK build
+- Updated README with all OS instructions
+
+### v1.0.0
+- Initial release
+- Voice chat, desktop control, file management
+- Emotions system with 7 moods
+- Multi-provider support (Gemini/Ollama/OpenRouter)
 
 ---
 
@@ -396,6 +508,7 @@ Mitsu also works on Android! The mobile version includes all the core features �
 | **Voice Input** | Speech-to-text via Android mic |
 | **Voice Output** | Text-to-speech with mood-based pitch |
 | **Emotions** | All 7 moods with voice changes |
+| **Auto-Theming** | UI colors change with mood |
 | **File Management** | Read, write, list files on device |
 | **Weather** | Real-time weather for any city |
 | **Calculator** | Math evaluation |
@@ -479,7 +592,9 @@ Check the [Releases page](https://github.com/virat013S/mitsu/releases) for pre-b
 | Browser Automation | Full | N/A |
 | File Management | Full | Basic (device storage) |
 | Emotions | Full | Full |
-| Emotions + Voice | Full | Full |
+| Auto-Theming | Full | Full |
+| Proactive Messaging | Full | Planned |
+| Casual Friend Mode | Full | Full |
 | Presentations | Full | N/A |
 | Deep Research | Full | N/A |
 | Weather | Full | Full |
@@ -494,3 +609,21 @@ Check the [Releases page](https://github.com/virat013S/mitsu/releases) for pre-b
 Mitsu is built by a 13-year-old who just wanted something cool. If you like it, star the repo. If you don't, open an issue and tell me what to fix.
 
 **Now go talk to your AI.** 🤖
+
+---
+
+## Share Mitsu
+
+If you think Mitsu is cool, spread the word! Here are some hashtags you can use:
+
+```
+#mitsu #aiassistant #python #voiceassistant #ollama #gemini #localai 
+#opensource #coding #pyqt6 #desktopapp #texttospeech #chatbot 
+#artificialintelligence #machinelearning #devtools #tech #software 
+#programming #developer #open-source #selfhosted #privacy #automation 
+#linux #macos #windows #android #mobileapp #kivy #buildozer 
+#cyber #digital #techlife #futuretech #smarthome #personalassistant 
+#jarvis #ironman #sci-fi #aibuddy #moodthemes #emotionai
+```
+
+**Star the repo:** https://github.com/virat013S/mitsu

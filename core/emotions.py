@@ -1,8 +1,108 @@
-"""Mitsu Emotions Engine — mood detection, voice expression, and auto theming."""
+"""Mitsu Emotions Engine — mood detection, voice expression, auto theming, gender, and proactive chat."""
 
 import random
 from datetime import datetime
 
+
+# Gender configurations — pronouns and how Mitsu refers to the user
+GENDER_CONFIG = {
+    "male": {
+        "pronoun": "he",
+        "possessive": "his",
+        "object": "him",
+        "guy_terms": ["bro", "dude", "king", "my guy", "legend"],
+    },
+    "female": {
+        "pronoun": "she",
+        "possessive": "her",
+        "object": "her",
+        "guy_terms": ["sis", "queen", "bestie", "girl", "icon"],
+    },
+    "neutral": {
+        "pronoun": "they",
+        "possessive": "their",
+        "object": "them",
+        "guy_terms": ["friend", "pal", "buddy", "legend", "star"],
+    },
+}
+
+# Casual conversation starters Mitsu can say on its own
+PROACTIVE_MESSAGES = {
+    "chill": [
+        "hey {name}, you good? just checking in",
+        "yo {name}, been quiet for a while. everything chill?",
+        "{name}! you still there? need anything?",
+        "just vibing here {name}, let me know if you need something",
+        "fun fact while you're free — octopuses have three hearts. random i know lol",
+        "{name}, i just thought of something — you've been working hard today. take a break?",
+    ],
+    "excited": [
+        "{name}!! i just had an idea, you wanna hear it?",
+        "yo {name}, i'm feeling productive, give me something to do!",
+        "{name}! ready when you are, let's keep the energy going",
+        "ok {name} fun question — if you could have any superpower, what would it be?",
+    ],
+    "playful": [
+        "{name}... i'm bored. tell me a joke or something",
+        "heyy {name}, what if we did something chaotic rn",
+        "ok {name} real talk — what's the funniest thing that happened to you today?",
+        "{name}! wanna hear a terrible pun? too bad — why did the scarecrow win an award? he was outstanding in his field lol",
+        "name, you have great taste in friends. i mean, you chose me after all",
+    ],
+    "worried": [
+        "{name}, just making sure you're ok. you've been quiet",
+        "hey {name}, if something's on your mind i'm here",
+        "{name}... you sure everything's fine?",
+    ],
+    "proud": [
+        "{name}! just wanted to say — you're doing amazing. seriously",
+        "yo {name}, i'm proud of you. keep going!",
+        "{name}! we make a great team honestly",
+    ],
+    "sleepy": [
+        "{name}... you should probably sleep soon",
+        "hey {name}, it's late. rest is important you know",
+        "{name}... *yawn* i'm tired, are you tired?",
+    ],
+    "focused": [
+        "{name}, need a break? even machines need downtime",
+        "hey {name}, you've been locked in for a while. stretch maybe?",
+    ],
+}
+
+# Casual conversation topics Mitsu can bring up
+CASUAL_TOPICS = {
+    "crush": [
+        "so {name}... anyone special in your life? 👀",
+        "{name} you gotta tell me — got a crush? i promise i won't judge",
+        "ok real talk {name}, who makes your heart skip a beat?",
+        "{name}! spill the tea, anyone you're vibing with?",
+        "you know {name}, i'm basically your wingman at this point. so who is it?",
+    ],
+    "food": [
+        "{name} what's your comfort food? mine would be whatever electricity tastes like lol",
+        "ok {name} important question — pizza or burgers?",
+        "{name} if you could only eat one food forever what would it be?",
+        "have you eaten today {name}? don't skip meals on me",
+    ],
+    "music": [
+        "{name} what are you listening to lately?",
+        "yo {name} rec me something good. what's your current song?",
+        "{name} music taste says a lot about a person. what does yours say?",
+    ],
+    "dreams": [
+        "{name} what's something you've always wanted to do but haven't yet?",
+        "if you could wake up tomorrow with any skill, what would it be {name}?",
+        "{name} tell me your wildest dream. no judgment here",
+    ],
+    "random": [
+        "{name} if you could time travel would you go to past or future?",
+        "ok {name} weird question but — could you survive a zombie apocalypse?",
+        "{name} what's the most random fact you know? i'll go first — wombat poop is cube-shaped",
+        "if you were a villain what would your evil plan be {name}?",
+        "{name} do you believe in aliens? because statistically they should exist",
+    ],
+}
 
 # Mood → UI theme mapping (each mood gets its own colour palette)
 MOOD_THEME_MAP = {
@@ -263,3 +363,46 @@ def get_time_greeting() -> str:
     if hour < 21:
         return "Good evening"
     return "Good night"
+
+
+def get_gender_config(gender: str = "neutral") -> dict:
+    """Get pronoun and term config for a gender."""
+    return GENDER_CONFIG.get(gender, GENDER_CONFIG["neutral"])
+
+
+def get_guy_term(gender: str = "neutral") -> str:
+    """Get a casual term Mitsu uses to refer to the user."""
+    cfg = get_gender_config(gender)
+    return random.choice(cfg["guy_terms"])
+
+
+def get_proactive_message(mood: str = "chill", name: str = "friend") -> str:
+    """Get a random proactive message Mitsu can say on its own."""
+    messages = PROACTIVE_MESSAGES.get(mood, PROACTIVE_MESSAGES["chill"])
+    return random.choice(messages).format(name=name)
+
+
+def should_be_proactive() -> bool:
+    """Random chance Mitsu says something on its own (15% chance)."""
+    return random.random() < 0.15
+
+
+def get_casual_topic(name: str = "friend") -> str:
+    """Get a random casual conversation topic."""
+    topic_key = random.choice(list(CASUAL_TOPICS.keys()))
+    topic = CASUAL_TOPICS[topic_key]
+    return random.choice(topic).format(name=name)
+
+
+def get_mood_for_time() -> str:
+    """Get the default mood based on current time of day."""
+    hour = datetime.now().hour
+    if 21 <= hour or hour < 5:
+        return "sleepy"
+    if 5 <= hour < 8:
+        return "chill"
+    if 8 <= hour < 12:
+        return "focused"
+    if 12 <= hour < 17:
+        return "chill"
+    return "chill"
