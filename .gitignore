@@ -94,3 +94,13 @@ outputs/
 *.codex_*_working
 tutorial_overlay.py.before_remove
 *.before_tutorial_overlay
+
+# Build artifacts
+android/.buildozer/
+android/bin/
+*.o
+*.so
+*.a
+__pycache__/
+*.pyc
+.venv/
