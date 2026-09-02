@@ -98,6 +98,7 @@ def _real_profile_dir(browser: str) -> str:
             "vivaldi":  [cfg / "vivaldi"],
             "opera":    [cfg / "opera"],
             "operagx":  [cfg / "opera-gx"],
+            "zen":      [home / ".zen"],
         }
         candidates = m.get(browser, [])
 
@@ -140,14 +141,46 @@ def _firefox_profile_dir() -> Optional[str]:
             k, _, v = line.partition("=")
             current[k.strip()] = v.strip()
 
-    p = current.get("Path", "")
-    if p and current.get("Default") == "1":
-        is_rel = current.get("IsRelative", "1") == "1"
-        default_path = str(base / p) if is_rel else p
+    if default_path is None:
+        p = current.get("Path", "")
+        if p:
+            is_rel = current.get("IsRelative", "1") == "1"
+            default_path = str(base / p) if is_rel else p
 
-    if default_path and Path(default_path).exists():
-        print(f"[Browser] Firefox real profile: {default_path}")
-        return default_path
+    return default_path
+
+
+def _zen_profile_dir() -> Optional[str]:
+    """Find Zen browser default profile (Firefox-based)."""
+    home = Path.home()
+    base = home / ".config" / "zen"
+
+    ini = base / "profiles.ini"
+    if not ini.exists():
+        return None
+
+    current: dict[str, str] = {}
+    default_path: Optional[str] = None
+
+    for line in ini.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = line.strip()
+        if line.startswith("["):
+            p = current.get("Path", "")
+            if p and current.get("Default") == "1":
+                is_rel = current.get("IsRelative", "1") == "1"
+                default_path = str(base / p) if is_rel else p
+            current = {}
+        elif "=" in line:
+            k, _, v = line.partition("=")
+            current[k.strip()] = v.strip()
+
+    if default_path is None:
+        p = current.get("Path", "")
+        if p:
+            is_rel = current.get("IsRelative", "1") == "1"
+            default_path = str(base / p) if is_rel else p
+
+    return default_path
     return None
 
 def _find_opera_windows() -> Optional[str]:
@@ -240,6 +273,7 @@ _BROWSER_SPECS: dict[str, dict] = {
         "edge":     {"engine": "chromium", "channel": None,
                      "bins": ["microsoft-edge", "microsoft-edge-stable"]},
         "firefox":  {"engine": "firefox",  "channel": None, "bins": ["firefox"]},
+        "zen":      {"engine": "firefox",  "channel": None, "bins": ["zen-browser", "zen"]},
         "opera":    {"engine": "chromium", "channel": None, "bins": ["opera", "opera-stable"]},
         "operagx":  {"engine": "chromium", "channel": None, "bins": ["opera", "opera-stable"]},
         "brave":    {"engine": "chromium", "channel": None, "bins": ["brave-browser", "brave"]},
@@ -257,6 +291,8 @@ _ALIASES: dict[str, str] = {
     "mozilla firefox": "firefox",
     "opera gx":        "operagx",
     "opera_gx":        "operagx",
+    "zen browser":     "zen",
+    "zen-browser":     "zen",
 }
 
 
@@ -318,7 +354,7 @@ def _detect_default_browser() -> str:
             )
             prog_id = winreg.QueryValueEx(k, "ProgId")[0].lower()
             winreg.CloseKey(k)
-            for kw in ("edge", "firefox", "opera", "brave", "vivaldi", "chrome"):
+            for kw in ("zen", "edge", "firefox", "opera", "brave", "vivaldi", "chrome"):
                 if kw in prog_id:
                     return kw
         elif _OS == "Darwin":
@@ -328,7 +364,7 @@ def _detect_default_browser() -> str:
                  "LSHandlers"],
                 capture_output=True, text=True, timeout=5,
             ).stdout.lower()
-            for kw in ("firefox", "opera", "brave", "vivaldi", "safari", "chrome", "edge"):
+            for kw in ("zen", "firefox", "opera", "brave", "vivaldi", "safari", "chrome", "edge"):
                 if kw in out:
                     return kw
         elif _OS == "Linux":
@@ -336,11 +372,15 @@ def _detect_default_browser() -> str:
                 ["xdg-settings", "get", "default-web-browser"],
                 capture_output=True, text=True, timeout=5,
             ).stdout.lower()
-            for kw in ("firefox", "opera", "brave", "vivaldi", "chrome", "edge"):
+            for kw in ("zen", "firefox", "opera", "brave", "vivaldi", "chrome", "edge"):
                 if kw in out:
                     return kw
     except Exception:
         pass
+    # Default to zen if installed, otherwise chrome
+    import shutil
+    if shutil.which("zen-browser") or shutil.which("zen"):
+        return "zen"
     return "chrome"
 
 
@@ -425,9 +465,15 @@ class _BrowserSession:
         engine_obj  = getattr(self._pw, engine_name)
 
         if engine_name == "firefox":
-            profile = _firefox_profile_dir() or str(
-                Path.home() / ".mitsu_profiles" / "firefox"
-            )
+            # Zen browser has its own profile directory
+            if self.browser_name == "zen":
+                profile = _zen_profile_dir() or str(
+                    Path.home() / ".mitsu_profiles" / "zen"
+                )
+            else:
+                profile = _firefox_profile_dir() or str(
+                    Path.home() / ".mitsu_profiles" / "firefox"
+                )
             kwargs: dict = {
                 "headless":    False,
                 "slow_mo":     0,
@@ -439,14 +485,14 @@ class _BrowserSession:
             try:
                 self._context = await engine_obj.launch_persistent_context(profile, **kwargs)
             except Exception as e:
-                print(f"[Browser] Firefox real profile failed ({e}), using MITSU profile")
-                mitsu = str(Path.home() / ".mitsu_profiles" / "firefox_mitsu")
+                print(f"[Browser] Firefox/Zen real profile failed ({e}), using MITSU profile")
+                mitsu = str(Path.home() / ".mitsu_profiles" / f"{self.browser_name}_mitsu")
                 Path(mitsu).mkdir(parents=True, exist_ok=True)
                 self._context = await engine_obj.launch_persistent_context(mitsu, **kwargs)
 
             await asyncio.sleep(0.5)  
             self._page = await self._context.new_page()
-            print(f"[Browser] ✅ Firefox launched")
+            print(f"[Browser] ✅ {self.browser_name.title()} launched")
             return
 
         if engine_name == "webkit":

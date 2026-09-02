@@ -242,6 +242,24 @@ Mitsu responds to natural language. Examples:
 
 ---
 
+## Android — Coming Soon
+
+Mitsu is coming to Android. The mobile version will feature:
+
+- **Same futuristic holographic UI** as the desktop version
+- **Voice chat** with multiple voice options
+- **Camera integration** — photo, video, and audio recording
+- **On-device AI** — works offline with local models
+- **Gemini cloud AI** — full power when connected
+- **Conversation memory** — remembers your past chats
+- **Proactive messaging** — Mitsu reaches out when you're quiet
+- **Touch-optimized** — large buttons, swipe gestures, portrait mode
+- **Multi-language** — speak any language, Mitsu adapts
+
+> Stay tuned. Building something special.
+
+---
+
 ## Credits
 
 - **Inspired by:** [JARVIS-OS](https://github.com/MAL19INDUSTRIES/JARVIS-OS-V.2)

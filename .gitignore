@@ -94,3 +94,8 @@ outputs/
 *.codex_*_working
 tutorial_overlay.py.before_remove
 *.before_tutorial_overlay
+
+# Buildozer
+android/.buildozer/
+android/bin/
+android/dists/

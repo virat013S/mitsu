@@ -1192,6 +1192,14 @@ class MitsuLive:
         self._last_input_transcript = self._current_input_transcript
         self._last_input_transcript_at = time.monotonic()
         outgoing_text = self._current_input_transcript
+
+        # Detect gender from message
+        try:
+            from core.emotions import detect_gender
+            detect_gender(message=outgoing_text)
+        except Exception:
+            pass
+
         if (
             not getattr(self, "_pending_self_quit", False)
             and self._is_explicit_self_quit_transcript(self._current_input_transcript)
