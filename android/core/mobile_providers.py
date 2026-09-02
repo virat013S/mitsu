@@ -46,7 +46,7 @@ def _get_provider():
     return "local"  # default to local if no API key
 
 
-def call_ai(user_message: str, mood: str = "chill") -> str:
+def call_ai(user_message: str, mood: str = "chill", context: str = None) -> str:
     """Call the AI provider and get a response."""
     provider = _get_provider()
 
@@ -57,6 +57,10 @@ def call_ai(user_message: str, mood: str = "chill") -> str:
         "Be casual and conversational. Keep responses concise but helpful. "
         f"Current mood vibe: {mood}. {mood_prefix}"
     )
+    
+    # Add memory context if available
+    if context:
+        system += f"\n\n{context}"
 
     messages = [
         {"role": "system", "content": system},
@@ -191,7 +195,7 @@ def _get_mood_prefix(mood):
     return prefixes.get(mood, "")
 
 
-def speak_mobile(text: str, voice_params: dict = None):
+def speak_mobile(text: str, voice_params: dict = None, voice_id: str = None):
     """Speak text on mobile using TTS."""
     try:
         if platform == "android":
@@ -200,17 +204,17 @@ def speak_mobile(text: str, voice_params: dict = None):
             tts.speech(text=text, lang="en")
         else:
             # Fallback to edge-tts on desktop
-            _speak_edge(text, voice_params)
+            _speak_edge(text, voice_params, voice_id)
     except Exception:
         pass
 
 
-def _speak_edge(text, voice_params=None):
+def _speak_edge(text, voice_params=None, voice_id=None):
     """Edge-TTS fallback for desktop testing."""
     try:
         import subprocess, tempfile
 
-        voice = "en-US-AriaNeural"
+        voice = voice_id or "en-US-AriaNeural"
         pitch = voice_params.get("pitch", "+0Hz") if voice_params else "+0Hz"
         rate = voice_params.get("rate", "+0%") if voice_params else "+0%"
 

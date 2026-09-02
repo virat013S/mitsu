@@ -35,6 +35,155 @@ sys.path.insert(0, str(Path(__file__).parent))
 from core.emotions import detect_user_tone, get_mood, get_greeting, get_voice_params
 from core.mobile_providers import call_ai, speak_mobile, recognize_speech
 from core.mobile_skills import execute_skill
+from core.mobile_memory import save_conversation, get_recent_conversations, format_conversation_context, save_user_info, get_user_info
+
+# ── Available Voices ───────────────────────────────────────────────────────
+VOICES = [
+    {"id": "en-US-AriaNeural", "name": "Aria (Female, US)", "gender": "female", "style": "Friendly"},
+    {"id": "en-US-GuyNeural", "name": "Guy (Male, US)", "gender": "male", "style": "Casual"},
+    {"id": "en-US-JennyNeural", "name": "Jenny (Female, US)", "gender": "female", "style": "Warm"},
+    {"id": "en-US-TonyNeural", "name": "Tony (Male, US)", "gender": "male", "style": "Energetic"},
+    {"id": "en-GB-SoniaNeural", "name": "Sonia (Female, UK)", "gender": "female", "style": "Elegant"},
+    {"id": "en-GB-RyanNeural", "name": "Ryan (Male, UK)", "gender": "male", "style": "Calm"},
+    {"id": "en-AU-NatashaNeural", "name": "Natasha (Female, AU)", "gender": "female", "style": "Bright"},
+    {"id": "en-AU-WilliamNeural", "name": "William (Male, AU)", "gender": "male", "style": "Deep"},
+]
+
+# ── Setup Screen ───────────────────────────────────────────────────────────
+class SetupScreen(BoxLayout):
+    """First-time setup: username + voice selection."""
+    def __init__(self, on_complete, **kwargs):
+        super().__init__(**kwargs)
+        self.orientation = "vertical"
+        self.spacing = dp(12)
+        self.padding = [dp(24), dp(20), dp(24), dp(20)]
+        self.on_complete = on_complete
+        self.selected_voice = VOICES[0]["id"]
+        self._voice_buttons = []
+
+        # Title
+        self.add_widget(Label(
+            text="[color=#ffffff][b]Welcome to M I T S U[/b][/color]",
+            markup=True,
+            font_size=sp(24),
+            size_hint_y=None,
+            height=dp(50),
+        ))
+
+        self.add_widget(Label(
+            text="Let's get you set up!",
+            font_size=sp(14),
+            color=(0.6, 0.6, 0.6, 1),
+            size_hint_y=None,
+            height=dp(30),
+        ))
+
+        # ── Username Section ───────────────────────────────────────────
+        self.add_widget(Label(
+            text="What should I call you?",
+            font_size=sp(16),
+            color=(0.8, 0.8, 0.8, 1),
+            size_hint_y=None,
+            height=dp(35),
+            halign="left",
+            text_size=(Window.width - dp(48), None),
+        ))
+
+        self.name_input = TextInput(
+            hint_text="Enter your name",
+            font_size=sp(18),
+            size_hint_y=None,
+            height=dp(56),
+            background_color=(0.12, 0.12, 0.12, 1),
+            foreground_color=(1, 1, 1, 1),
+            hint_text_color=(0.4, 0.4, 0.4, 1),
+            cursor_color=(1, 1, 1, 1),
+            multiline=False,
+            padding=[dp(16), dp(14)],
+            border=[0, 0, 0, 0],
+        )
+        self.add_widget(self.name_input)
+
+        # ── Voice Section ──────────────────────────────────────────────
+        self.add_widget(Label(
+            text="Choose a voice for Mitsu:",
+            font_size=sp(16),
+            color=(0.8, 0.8, 0.8, 1),
+            size_hint_y=None,
+            height=dp(35),
+            halign="left",
+            text_size=(Window.width - dp(48), None),
+        ))
+
+        # Voice grid
+        voice_scroll = ScrollView(
+            size_hint_y=None,
+            height=dp(200),
+            do_scroll_x=False,
+        )
+        voice_grid = GridLayout(
+            cols=1,
+            size_hint_y=None,
+            spacing=dp(8),
+            padding=[dp(0), dp(4)],
+        )
+        voice_grid.bind(minimum_height=voice_grid.setter("height"))
+
+        for i, voice in enumerate(VOICES):
+            btn = TouchButton(
+                text=f"  {voice['name']}  —  {voice['style']}",
+                size_hint_y=None,
+                height=dp(48),
+                font_size=sp(13),
+                halign="left",
+                background_color=(0.15, 0.15, 0.15, 1),
+            )
+            btn.voice_id = voice["id"]
+            btn.bind(on_press=lambda b, vid=voice["id"]: self._select_voice(vid))
+            self._voice_buttons.append(btn)
+            voice_grid.add_widget(btn)
+
+        voice_scroll.add_widget(voice_grid)
+        self.add_widget(voice_scroll)
+
+        # ── Start Button ───────────────────────────────────────────────
+        start_btn = TouchButton(
+            text="Start Chatting",
+            font_size=sp(16),
+            size_hint_y=None,
+            height=dp(56),
+            background_color=(0.1, 0.2, 0.1, 1),
+            color=(0, 1, 0.5, 1),
+        )
+        start_btn.bind(on_press=self._on_start)
+        self.add_widget(start_btn)
+
+        self._update_voice_highlight()
+
+    def _select_voice(self, voice_id):
+        self.selected_voice = voice_id
+        self._update_voice_highlight()
+
+    def _update_voice_highlight(self):
+        for btn in self._voice_buttons:
+            if btn.voice_id == self.selected_voice:
+                btn.background_color = (0.1, 0.3, 0.2, 1)
+                btn.color = (0, 1, 0.5, 1)
+            else:
+                btn.background_color = (0.15, 0.15, 0.15, 1)
+                btn.color = (0.8, 0.8, 0.8, 1)
+
+    def _on_start(self, *args):
+        name = self.name_input.text.strip()
+        if not name:
+            self.name_input.hint_text = "Please enter your name!"
+            return
+        # Save username + voice
+        config_dir = Path.home() / ".mitsu"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        (config_dir / "username.txt").write_text(name)
+        (config_dir / "voice.txt").write_text(self.selected_voice)
+        self.on_complete(name, self.selected_voice)
 
 
 # ── Theme Colors ─────────────────────────────────────────────────────────
@@ -133,6 +282,7 @@ class MitsuLayout(BoxLayout):
         self.padding = 0
 
         self.username = self._load_username()
+        self.selected_voice = self._load_voice()
         self.current_mood = "chill"
         self.current_mood_data = get_mood("chill")
         self.is_listening = False
@@ -141,9 +291,12 @@ class MitsuLayout(BoxLayout):
         self._proactive_timer = None
         self._last_user_input_at = time.time()
 
-        self._build_ui()
-        self._show_greeting()
-        self._start_proactive_timer()
+        if self.username:
+            self._build_ui()
+            self._show_greeting()
+            self._start_proactive_timer()
+        else:
+            self._show_setup()
 
         # Bind to window resize for landscape/portrait
         Window.bind(on_resize=self._on_resize)
@@ -164,6 +317,15 @@ class MitsuLayout(BoxLayout):
             pass
         return ""
 
+    def _load_voice(self):
+        try:
+            voice_file = Path.home() / ".mitsu" / "voice.txt"
+            if voice_file.exists():
+                return voice_file.read_text().strip()
+        except Exception:
+            pass
+        return "en-US-AriaNeural"
+
     def _save_username(self, name):
         try:
             user_file = Path.home() / ".mitsu" / "username.txt"
@@ -171,6 +333,22 @@ class MitsuLayout(BoxLayout):
             user_file.write_text(name)
         except Exception:
             pass
+
+    def _show_setup(self):
+        """Show first-time setup screen."""
+        self.clear_widgets()
+        setup = SetupScreen(on_complete=self._on_setup_complete)
+        self.add_widget(setup)
+
+    def _on_setup_complete(self, name, voice_id):
+        """Called when setup is done."""
+        self.username = name
+        self.selected_voice = voice_id
+        self.clear_widgets()
+        self._build_ui()
+        self._show_greeting()
+        self._start_proactive_timer()
+        self._on_resize(Window, Window.width, Window.height)
 
     def _start_proactive_timer(self):
         """Start proactive messaging timer (only when app is open)."""
@@ -392,11 +570,30 @@ class MitsuLayout(BoxLayout):
         self.chat_scroll.scroll_y = 0
 
     def _show_greeting(self):
-        if self.username:
+        # Check if we have past conversations
+        recent = get_recent_conversations(3)
+        if recent:
+            # We have memory - reference it
+            topics = []
+            for conv in recent:
+                msg = conv.get("user", "").lower()
+                if any(w in msg for w in ["music", "song", "listen"]):
+                    topics.append("music")
+                elif any(w in msg for w in ["movie", "film", "watch"]):
+                    topics.append("movies")
+                elif any(w in msg for w in ["food", "eat", "hungry"]):
+                    topics.append("food")
+                elif any(w in msg for w in ["game", "play"]):
+                    topics.append("gaming")
+            
             greeting = get_greeting(self.current_mood, self.username)
+            if topics:
+                topic_str = ", ".join(set(topics))
+                greeting += f"\n\nLast time we talked about {topic_str}. What's up now?"
             self._add_chat(f"[color=#00ff88]SYS:[/color] {greeting}", "system")
         else:
-            self._add_chat("[color=#00ff88]SYS:[/color] Hey! I'm Mitsu. What's your name?", "system")
+            greeting = get_greeting(self.current_mood, self.username)
+            self._add_chat(f"[color=#00ff88]SYS:[/color] {greeting}", "system")
 
         self._add_chat("[color=#00ff88]SYS:[/color] Tap 🎤 for voice, 📷 for camera, or type a message.", "system")
 
@@ -433,8 +630,14 @@ class MitsuLayout(BoxLayout):
             # Check for built-in commands
             response = self._handle_command(text)
             if response is None:
-                # Call AI
-                response = call_ai(text, self.current_mood)
+                # Get conversation context for better responses
+                context = format_conversation_context(limit=5)
+                
+                # Call AI with context
+                response = call_ai(text, self.current_mood, context=context)
+
+            # Save to memory
+            save_conversation(text, response, self.current_mood)
 
             # Update UI
             Clock.schedule_once(lambda dt: self._add_chat(response, "mitsu"), 0)
@@ -442,7 +645,7 @@ class MitsuLayout(BoxLayout):
 
             # Speak response
             voice_params = get_voice_params(self.current_mood)
-            speak_mobile(response, voice_params)
+            speak_mobile(response, voice_params, self.selected_voice)
 
         except Exception as e:
             Clock.schedule_once(
