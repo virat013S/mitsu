@@ -1,7 +1,47 @@
-"""Mitsu Emotions Engine — mood detection and voice expression."""
+"""Mitsu Emotions Engine — mood detection, voice expression, and auto theming."""
 
 import random
 from datetime import datetime
+
+
+# Mood → UI theme mapping (each mood gets its own colour palette)
+MOOD_THEME_MAP = {
+    "chill": "mitsu_noir",
+    "excited": "arc_reactor",
+    "focused": "stealth_red",
+    "playful": "vibranium_purple",
+    "worried": "nanotech_gold",
+    "proud": "platinum",
+    "sleepy": "mitsu_noir",
+}
+
+# Time-of-day contextual phrases
+TIME_CONTEXTS = {
+    "early_morning": {  # 5-8 AM
+        "greeting": ["early bird huh?", "you're up early today"],
+        "question": ["did you sleep well?", "how'd you sleep?"],
+    },
+    "morning": {  # 8-12 PM
+        "greeting": ["good morning!", "morning!"],
+        "question": ["did you eat breakfast?", "had your coffee yet?"],
+    },
+    "afternoon": {  # 12-5 PM
+        "greeting": ["hey!", "what's up"],
+        "question": ["did you have lunch?", "have you eaten yet?"],
+    },
+    "evening": {  # 5-9 PM
+        "greeting": ["hey there", "good evening"],
+        "question": ["how was your day?", "tired from today?"],
+    },
+    "night": {  # 9-11 PM
+        "greeting": ["still going huh?", "night owl mode"],
+        "question": ["getting late, you sure?", "don't stay up too late"],
+    },
+    "late_night": {  # 11 PM - 5 AM
+        "greeting": ["it's really late...", "you should be sleeping"],
+        "question": ["everything ok? it's late", "need rest soon?"],
+    },
+}
 
 
 # Mood definitions: (mood_name, text_tone, voice_pitch, voice_rate)
@@ -179,3 +219,47 @@ def get_voice_params(mood_name: str) -> dict:
         "pitch": mood.get("voice_pitch", "+0Hz"),
         "rate": mood.get("voice_rate", "+0%"),
     }
+
+
+def get_theme_for_mood(mood_name: str) -> str:
+    """Get the UI theme key for a given mood."""
+    return MOOD_THEME_MAP.get(mood_name, "mitsu_noir")
+
+
+def _get_time_period(hour: int) -> str:
+    """Map an hour to a time period key."""
+    if 5 <= hour < 8:
+        return "early_morning"
+    if 8 <= hour < 12:
+        return "morning"
+    if 12 <= hour < 17:
+        return "afternoon"
+    if 17 <= hour < 21:
+        return "evening"
+    if 21 <= hour < 23:
+        return "night"
+    return "late_night"
+
+
+def get_time_context() -> dict:
+    """Get time-of-day contextual greeting and question strings."""
+    hour = datetime.now().hour
+    period = _get_time_period(hour)
+    ctx = TIME_CONTEXTS[period]
+    return {
+        "period": period,
+        "greeting": random.choice(ctx["greeting"]),
+        "question": random.choice(ctx["question"]),
+    }
+
+
+def get_time_greeting() -> str:
+    """Get a time-aware greeting string like 'good morning'."""
+    hour = datetime.now().hour
+    if hour < 12:
+        return "Good morning"
+    if hour < 17:
+        return "Good afternoon"
+    if hour < 21:
+        return "Good evening"
+    return "Good night"

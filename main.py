@@ -1182,8 +1182,10 @@ class MitsuLive:
         if not self._loop or not self.session:
             return
         try:
-            from core.emotions import detect_user_tone
+            from core.emotions import detect_user_tone, get_theme_for_mood
             self._current_mood = detect_user_tone(text)
+            from ui import ThemeManager
+            ThemeManager.set_theme(get_theme_for_mood(self._current_mood))
         except Exception:
             pass
         asyncio.run_coroutine_threadsafe(self.send_text(text), self._loop)
@@ -1408,6 +1410,23 @@ class MitsuLive:
 
     async def _announce_startup(self):
         try:
+            from core.emotions import get_time_context, get_theme_for_mood
+            from ui import ThemeManager
+
+            # Set initial theme based on time of day
+            hour = __import__("datetime").datetime.now().hour
+            if 21 <= hour or hour < 5:
+                initial_mood = "sleepy"
+            elif 5 <= hour < 8:
+                initial_mood = "chill"
+            elif 8 <= hour < 12:
+                initial_mood = "focused"
+            elif 12 <= hour < 17:
+                initial_mood = "chill"
+            else:
+                initial_mood = "chill"
+            ThemeManager.set_theme(get_theme_for_mood(initial_mood))
+
             memory = load_memory()
             name_entry = memory.get("identity", {}).get("name")
             name = None
@@ -1415,10 +1434,10 @@ class MitsuLive:
                 name = name_entry.get("value")
             elif isinstance(name_entry, str):
                 name = name_entry
-            if name:
-                greeting = f"Mitsu. At your service, {name}. What would you like to accomplish today?"
-            else:
-                greeting = "Mitsu. At your service, Sir or Madam. What would you like to accomplish today?"
+
+            ctx = get_time_context()
+            display_name = name or "friend"
+            greeting = f"Mitsu. {ctx['greeting'].capitalize()}, {display_name}. {ctx['question'].capitalize()}"
             await self.session.send_client_content(
                 turns={"parts": [{"text": greeting}]},
                 turn_complete=True,
@@ -2207,22 +2226,14 @@ def _setup_provider(provider: str) -> bool:
 def _greet_user(username: str) -> str:
     """Generate a greeting based on whether user is new or returning."""
     import random
-    from datetime import datetime
+    from core.emotions import get_time_context
 
-    hour = datetime.now().hour
-    if hour < 12:
-        time_greet = "Good morning"
-    elif hour < 17:
-        time_greet = "Good afternoon"
-    else:
-        time_greet = "Good evening"
-
+    ctx = get_time_context()
     greetings = [
-        f"{time_greet}, {username}! What are we getting into today?",
-        f"Hey {username}! Ready to get stuff done?",
-        f"Welcome back, {username}! What's the plan?",
-        f"{time_greet}! I've been waiting. Let's do this, {username}.",
-        f"Hey hey {username}! What are we working on?",
+        f"{ctx['greeting'].capitalize()}, {username}! {ctx['question'].capitalize()}",
+        f"Hey {username}! {ctx['greeting'].capitalize()}",
+        f"{ctx['greeting'].capitalize()}! {ctx['question'].capitalize()} Let's do this, {username}.",
+        f"Welcome back, {username}! {ctx['question'].capitalize()}",
     ]
     return random.choice(greetings)
 
