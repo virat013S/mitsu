@@ -25,8 +25,8 @@ android.sdk = 33
 android.archs = arm64-v8a
 android.enable_split = False
 
-# Gradle dependencies (for Android-specific features)
-android.gradle_dependencies = com.google.android.gms:play-services-speech:19.0.1,com.google.android.gms:play-services-location:21.0.1,com.google.android.gms:play-services-vision:20.1.3
+# Gradle dependencies (not needed - we use plyer for all Android features)
+# android.gradle_dependencies = com.google.android.gms:play-services-speech:21.0.0,com.google.android.gms:play-services-location:21.1.0,com.google.android.gms:play-services-vision:20.1.3
 
 # P4A (python-for-android) recipe
 p4a.branch = develop
