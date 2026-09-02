@@ -8,12 +8,14 @@ Skills give even small local models (Gemma 3 1B) superpowers:
 - Web Search: search the internet
 - Datetime: current time, date math
 - JSON Parser: extract structured data
+- Camera: take photos and record videos
 """
 
 from __future__ import annotations
 
 import json
 import math
+import os
 import re
 import subprocess
 import tempfile
@@ -175,6 +177,62 @@ def skill_json_parse(text: str) -> str:
         return f"Parse error: {e}"
 
 
+# ── Camera Skills ────────────────────────────────────────────────────────────
+
+def skill_take_photo(output_path: str = "") -> str:
+    """Take a photo using the system camera and save it."""
+    try:
+        import cv2
+        if not output_path:
+            output_path = str(Path.home() / "Pictures" / f"mitsu_photo_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg")
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        cam = cv2.VideoCapture(0)
+        if not cam.isOpened():
+            return "Error: No camera found. Make sure a camera is connected."
+        ret, frame = cam.read()
+        cam.release()
+        if ret:
+            cv2.imwrite(output_path, frame)
+            return f"Photo saved to {output_path}"
+        return "Error: Failed to capture photo"
+    except ImportError:
+        return "Error: opencv-python not installed. Run: pip install opencv-python"
+    except Exception as e:
+        return f"Camera error: {e}"
+
+
+def skill_record_video(duration: int = 5, output_path: str = "") -> str:
+    """Record a video for a specified duration (in seconds)."""
+    try:
+        import cv2
+        if not output_path:
+            output_path = str(Path.home() / "Videos" / f"mitsu_video_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4")
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        cam = cv2.VideoCapture(0)
+        if not cam.isOpened():
+            return "Error: No camera found. Make sure a camera is connected."
+        fps = 20.0
+        width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        frames_recorded = 0
+        total_frames = int(fps * duration)
+        while frames_recorded < total_frames:
+            ret, frame = cam.read()
+            if not ret:
+                break
+            out.write(frame)
+            frames_recorded += 1
+        cam.release()
+        out.release()
+        return f"Video ({duration}s) saved to {output_path}"
+    except ImportError:
+        return "Error: opencv-python not installed. Run: pip install opencv-python"
+    except Exception as e:
+        return f"Video recording error: {e}"
+
+
 # ── Skill Registry ──────────────────────────────────────────────────────────
 
 SKILLS = {
@@ -243,6 +301,18 @@ SKILLS = {
         "description": "Identify who is speaking from an audio file.",
         "function": lambda audio_path: "",  # placeholder
         "params": {"audio_path": "str"},
+    },
+    "take_photo": {
+        "name": "take_photo",
+        "description": "Take a photo using the system camera. Use when user asks to take a picture or screenshot themselves.",
+        "function": skill_take_photo,
+        "params": {"output_path": "str (optional, default: ~/Pictures/mitsu_photo_*.jpg)"},
+    },
+    "record_video": {
+        "name": "record_video",
+        "description": "Record a video using the system camera for a specified duration. Use when user asks to record a video.",
+        "function": skill_record_video,
+        "params": {"duration": "int (seconds, default 5)", "output_path": "str (optional)"},
     },
 }
 

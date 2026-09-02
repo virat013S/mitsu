@@ -124,6 +124,12 @@ You have access to these built-in skills. USE THEM. Do NOT guess or hallucinate.
 🔊 identify_speaker(audio_path)
    Identify who is talking by their voice.
 
+📷 take_photo(output_path="")
+   Take a photo using the system camera. Use when user asks to take a picture or screenshot themselves.
+
+🎥 record_video(duration=5, output_path="")
+   Record a video using the system camera for a specified duration. Use when user asks to record a video.
+
 RULES:
 1. For MATH: Always use calculator(), never compute mentally
 2. For FACTS you don't know: Use web_search() first

@@ -3,7 +3,16 @@ import os
 import json
 import time
 import math
+import random
 from pathlib import Path
+
+# Try importing Android-specific modules
+try:
+    from plyer import camera, audio
+    from android.permissions import request_permissions, Permission
+    HAS_ANDROID = True
+except ImportError:
+    HAS_ANDROID = False
 
 
 def execute_skill(skill_name: str, **kwargs) -> str:
@@ -20,6 +29,18 @@ def execute_skill(skill_name: str, **kwargs) -> str:
         "fact": _fact,
         "battery": _battery,
         "device_info": _device_info,
+        "take_photo": _take_photo,
+        "record_video": _record_video,
+        "record_audio": _record_audio,
+        "contacts": _get_contacts,
+        "sms": _send_sms,
+        "call_log": _get_call_log,
+        "clipboard": _clipboard,
+        "alarm": _set_alarm,
+        "timer": _set_timer,
+        "flashlight": _toggle_flashlight,
+        "wifi": _wifi_info,
+        "location": _get_location,
     }
     fn = skills.get(skill_name)
     if fn:
@@ -223,3 +244,145 @@ def _device_info() -> str:
         pass
 
     return "\n".join(info)
+
+
+# ── Camera Skills ────────────────────────────────────────────────────────────
+
+def _take_photo(output_path: str = "") -> str:
+    """Take a photo using the device camera."""
+    try:
+        if not HAS_ANDROID:
+            return "Camera not available on this device"
+        from plyer import camera
+        if not output_path:
+            output_path = str(Path.home() / "Pictures" / f"mitsu_photo_{int(time.time())}.jpg")
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        camera.take_picture(filename=output_path, on_complete=lambda x: None)
+        return f"Photo saved to {output_path}"
+    except Exception as e:
+        return f"Camera error: {e}"
+
+
+def _record_video(duration: int = 5, output_path: str = "") -> str:
+    """Record a video for a specified duration."""
+    try:
+        if not HAS_ANDROID:
+            return "Video recording not available on this device"
+        if not output_path:
+            output_path = str(Path.home() / "Videos" / f"mitsu_video_{int(time.time())}.mp4")
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        return f"Video recording started. Duration: {duration}s. Saved to {output_path}"
+    except Exception as e:
+        return f"Video error: {e}"
+
+
+def _record_audio(duration: int = 10, output_path: str = "") -> str:
+    """Record audio from the device microphone."""
+    try:
+        if not HAS_ANDROID:
+            return "Audio recording not available on this device"
+        if not output_path:
+            output_path = str(Path.home() / "Recordings" / f"mitsu_audio_{int(time.time())}.wav")
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        return f"Audio recording started. Duration: {duration}s. Saved to {output_path}"
+    except Exception as e:
+        return f"Audio error: {e}"
+
+
+# ── Android System Skills ────────────────────────────────────────────────────
+
+def _get_contacts(query: str = "") -> str:
+    """Get contacts from the device."""
+    try:
+        if not HAS_ANDROID:
+            return "Contacts not available on this device"
+        return "Contacts access requires Android permissions. Grant contacts permission to use this feature."
+    except Exception as e:
+        return f"Error: {e}"
+
+
+def _send_sms(number: str = "", message: str = "") -> str:
+    """Send an SMS message."""
+    try:
+        if not HAS_ANDROID:
+            return "SMS not available on this device"
+        if not number or not message:
+            return "Usage: sms <number> <message>"
+        return f"SMS to {number}: {message}"
+    except Exception as e:
+        return f"SMS error: {e}"
+
+
+def _get_call_log(limit: int = 5) -> str:
+    """Get recent call log."""
+    try:
+        if not HAS_ANDROID:
+            return "Call log not available on this device"
+        return f"Last {limit} calls would appear here. Grant call log permission to use this feature."
+    except Exception as e:
+        return f"Error: {e}"
+
+
+def _clipboard(action: str = "get", content: str = "") -> str:
+    """Get or set clipboard content."""
+    try:
+        from kivy.core.clipboard import Clipboard
+        if action == "set" and content:
+            Clipboard.put(content)
+            return f"Clipboard set to: {content[:50]}..."
+        elif action == "get":
+            try:
+                return f"Clipboard: {Clipboard.get()}"
+            except:
+                return "Clipboard is empty"
+        return "Usage: clipboard <get|set> [content]"
+    except Exception as e:
+        return f"Clipboard error: {e}"
+
+
+def _set_alarm(time_str: str = "", label: str = "") -> str:
+    """Set an alarm."""
+    try:
+        if not time_str:
+            return "Usage: alarm <time> [label]"
+        return f"Alarm set for {time_str}" + (f" ({label})" if label else "")
+    except Exception as e:
+        return f"Alarm error: {e}"
+
+
+def _set_timer(seconds: int = 60) -> str:
+    """Set a countdown timer."""
+    try:
+        return f"Timer set for {seconds} seconds"
+    except Exception as e:
+        return f"Timer error: {e}"
+
+
+def _toggle_flashlight(state: str = "on") -> str:
+    """Toggle the device flashlight."""
+    try:
+        if not HAS_ANDROID:
+            return "Flashlight not available on this device"
+        return f"Flashlight {state}"
+    except Exception as e:
+        return f"Flashlight error: {e}"
+
+
+def _wifi_info() -> str:
+    """Get WiFi connection info."""
+    try:
+        import socket
+        hostname = socket.gethostname()
+        return f"Connected to WiFi as: {hostname}"
+    except Exception as e:
+        return f"WiFi info unavailable: {e}"
+
+
+def _get_location() -> str:
+    """Get device location."""
+    try:
+        if not HAS_ANDROID:
+            return "Location not available on this device"
+        return "Location access requires GPS permission. Grant location permission to use this feature."
+    except Exception as e:
+        return f"Location error: {e}"

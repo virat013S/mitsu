@@ -6,20 +6,17 @@ import random
 from pathlib import Path
 
 # ── Provider Config ──────────────────────────────────────────────────────
+# Android supports only 2 providers: Gemini (cloud) and Local (on-device)
 PROVIDERS = {
     "gemini": {
-        "name": "Gemini (Google)",
+        "name": "Gemini (Google Cloud)",
         "model": "gemini-2.5-flash",
+        "description": "Best quality, requires internet",
     },
-    "ollama": {
-        "name": "Ollama (Local)",
-        "model": "gemma3:1b",
-        "base_url": "http://localhost:11434",
-    },
-    "openrouter": {
-        "name": "OpenRouter",
-        "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
-        "base_url": "https://openrouter.ai/api/v1",
+    "local": {
+        "name": "Local (On-Device)",
+        "model": "builtin",
+        "description": "Basic responses, works offline",
     },
 }
 
@@ -45,10 +42,8 @@ def _get_provider():
     # Check available keys
     if os.environ.get("GEMINI_API_KEY"):
         return "gemini"
-    if os.environ.get("OPENROUTER_API_KEY"):
-        return "openrouter"
 
-    return "gemini"  # default
+    return "local"  # default to local if no API key
 
 
 def call_ai(user_message: str, mood: str = "chill") -> str:
@@ -58,7 +53,7 @@ def call_ai(user_message: str, mood: str = "chill") -> str:
     # Build mood-aware system prompt
     mood_prefix = _get_mood_prefix(mood)
     system = (
-        "You are Mitsu — a friendly, witty AI assistant. "
+        "You are Mitsu — a friendly, witty AI assistant on Android. "
         "Be casual and conversational. Keep responses concise but helpful. "
         f"Current mood vibe: {mood}. {mood_prefix}"
     )
@@ -71,10 +66,8 @@ def call_ai(user_message: str, mood: str = "chill") -> str:
     try:
         if provider == "gemini":
             return _call_gemini(messages)
-        elif provider == "ollama":
-            return _call_ollama(messages)
-        elif provider == "openrouter":
-            return _call_openrouter(messages)
+        else:
+            return _call_local(user_message, mood)
     except Exception as e:
         return f"API Error: {str(e)}"
 
@@ -109,58 +102,79 @@ def _call_gemini(messages):
         return data["candidates"][0]["content"]["parts"][0]["text"]
 
 
-def _call_ollama(messages):
-    """Call local Ollama API."""
-    import urllib.request
+def _call_local(user_message: str, mood: str) -> str:
+    """Local fallback responses when no API is available."""
+    msg = user_message.lower()
 
-    base_url = PROVIDERS["ollama"]["base_url"]
-    model = PROVIDERS["ollama"]["model"]
+    # Greeting responses
+    if any(w in msg for w in ["hello", "hi", "hey", "sup", "yo"]):
+        return random.choice([
+            "Hey! What's up?",
+            "Hi there! How can I help?",
+            "Yo! What's good?",
+            "Hey! Ready to chat?",
+        ])
 
-    payload = json.dumps({
-        "model": model,
-        "messages": messages,
-        "stream": False,
-    }).encode()
+    # How are you
+    if any(w in msg for w in ["how are you", "how r u", "you good"]):
+        return random.choice([
+            "I'm good! Just vibing. What about you?",
+            "Doing great! What's on your mind?",
+            "All good here! What can I do for you?",
+        ])
 
-    req = urllib.request.Request(
-        f"{base_url}/api/chat",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-    )
+    # Time
+    if "time" in msg:
+        return f"It's {time.strftime('%I:%M %p')}"
 
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        data = json.loads(resp.read())
-        return data["message"]["content"]
+    # Date
+    if "date" in msg or "today" in msg:
+        return f"Today is {time.strftime('%A, %B %d, %Y')}"
 
+    # Name
+    if "your name" in msg or "who are you" in msg:
+        return "I'm Mitsu! Your AI assistant on Android."
 
-def _call_openrouter(messages):
-    """Call OpenRouter API."""
-    import urllib.request
+    # Jokes
+    if "joke" in msg:
+        jokes = [
+            "Why do programmers prefer dark mode? Because light attracts bugs!",
+            "What's a robot's favorite type of music? Heavy metal.",
+            "Why was the computer cold? It left its Windows open!",
+            "What do you call a computer that sings? A-Dell.",
+        ]
+        return random.choice(jokes)
 
-    api_key = os.environ.get("OPENROUTER_API_KEY", "")
-    if not api_key:
-        return "OpenRouter API key not set. Please configure it in settings."
+    # Help
+    if "help" in msg:
+        return (
+            "I can help with:\n"
+            "• Chat about anything\n"
+            "• Time and date\n"
+            "• Jokes and fun facts\n"
+            "• Camera (photo/video/audio)\n"
+            "• Weather, contacts, SMS\n"
+            "• And much more!"
+        )
 
-    base_url = PROVIDERS["openrouter"]["base_url"]
-    model = PROVIDERS["openrouter"]["model"]
+    # Default responses
+    defaults = [
+        "Interesting! Tell me more.",
+        "Got it! What else?",
+        "Cool! What else is on your mind?",
+        "I hear you! What would you like to do?",
+        "Nice! Anything else I can help with?",
+    ]
 
-    payload = json.dumps({
-        "model": model,
-        "messages": messages,
-    }).encode()
+    # If Gemini is not available, give a helpful message
+    if not os.environ.get("GEMINI_API_KEY"):
+        return (
+            "I'm running in local mode right now. "
+            "For smarter responses, add a Gemini API key in settings! "
+            + random.choice(defaults)
+        )
 
-    req = urllib.request.Request(
-        f"{base_url}/chat/completions",
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        },
-    )
-
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        data = json.loads(resp.read())
-        return data["choices"][0]["message"]["content"]
+    return random.choice(defaults)
 
 
 def _get_mood_prefix(mood):
@@ -225,7 +239,7 @@ def recognize_speech() -> str | None:
         if platform == "android":
             # Use Android speech recognition via plyer
             from plyer import speech
-            result = speechpeech_to_text(timeout=10)
+            result = speech.speech_to_text(timeout=10)
             return result
         else:
             # Fallback to speech_recognition library

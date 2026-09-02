@@ -6,39 +6,33 @@ package.name = mitsu
 package.domain = com.virat013s.mitsu
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,txt,json
-version = 1.0.0
-version.code = 1
+version = 2.0.0
+version.code = 2
 
 # Requirements
 requirements = python3,kivy,android,plyer,pyjnius,urllib3,certifi
-# PIL for image processing (optional, can remove if not needed)
-# requirements += pillow
 
-# Permissions
-android.permissions = INTERNET,RECORD_AUDIO,CAMERA,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,VIBRATE,RECEIVE_BOOT_COMPLETED,SYSTEM_ALERT_WINDOW,WAKE_LOCK
+# Permissions - comprehensive list for all features
+android.permissions = INTERNET,RECORD_AUDIO,CAMERA,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,VIBRATE,RECEIVE_BOOT_COMPLETED,SYSTEM_ALERT_WINDOW,WAKE_LOCK,ACCESS_FINE_LOCATION,ACCESS_COARSE_LOCATION,READ_CONTACTS,READ_CALL_LOG,SEND_SMS,CALL_PHONE,ACCESS_WIFI_STATE,ACCESS_NETWORK_STATE,FLASHLIGHT,READ_CALENDAR,WRITE_CALENDAR,SET_ALARM,RECEIVE_SMS
 
-# Android API
+# Android API - supports Android 5.0+ (API 21+)
 android.api = 33
-android.minapi = 24
+android.minapi = 21
 android.ndk = 25b
 android.sdk = 33
 
-# Build settings
-android.arch = arm64-v8a
-# Options: armeabi-v7a, arm64-v8a, x86, x86_64
+# Build for ALL architectures to support every device
+android.archs = arm64-v8a, armeabi-v7a, x86, x86_64
+android.enable_split = True
 
 # Gradle dependencies (for Android-specific features)
-android.gradle_dependencies = com.google.android.gms:play-services-speech:19.0.1
+android.gradle_dependencies = com.google.android.gms:play-services-speech:19.0.1,com.google.android.gms:play-services-location:21.0.1,com.google.android.gms:play-services-vision:20.1.3
 
 # P4A (python-for-android) recipe
 p4a.branch = develop
 
-# Icon and presplash
-# icon.filename = %(source.dir)s/assets/img/icon.png
-# presplash.filename = %(source.dir)s/assets/img/presplash.png
-
-# Orientation
-orientation = portrait
+# Orientation - support both portrait and landscape
+orientation = portrait,landscape
 
 # Fullscreen
 fullscreen = 1
@@ -56,20 +50,21 @@ android.allow_backup = True
 # Private storage
 android.private_storage = True
 
-# SMS permission (not needed, remove if causes issues)
-# android.add_android_manifest_activity = org.kivy.android.PythonActivity
+# Default assistant intent filters
+android.add_android_manifest_intent = android.intent.action.ASSIST,android.intent.action.VOICE_COMMAND,android.intent.action.LONG_PRESS_POWER_KEY
 
-# Service (for background TTS, optional)
-# android.services = mitsu_service:MitsuService
+# Service for background TTS and proactive messaging
+android.services = mitsu_service:MitsuService
 
 # Proguard (for release builds)
 android.enable_proguard = False
 
-# Split APK by ABI (for smaller downloads)
-android.enable_split = False
-
 # Android X
 android.enable_androidx = True
+
+# Play Store ready
+android.enable_playstore = False
+android.backups_allowed = True
 
 # Build APK
 [buildozer]

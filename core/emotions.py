@@ -383,8 +383,8 @@ def get_proactive_message(mood: str = "chill", name: str = "friend") -> str:
 
 
 def should_be_proactive() -> bool:
-    """Random chance Mitsu says something on its own (15% chance)."""
-    return random.random() < 0.15
+    """Random chance Mitsu says something on its own (50% chance)."""
+    return random.random() < 0.50
 
 
 def get_casual_topic(name: str = "friend") -> str:

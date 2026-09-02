@@ -1,6 +1,8 @@
 """
 MITSU — Android Version
 Built with Kivy for APK packaging
+Supports: Assistant mode, Camera, Voice, and all core features
+Touch-friendly UI with portrait/landscape support
 """
 import os
 import sys
@@ -15,7 +17,6 @@ os.environ["KIVY_NO_ARGS"] = "1"
 from kivy.app import App
 from kivy.clock import Clock
 from kivy.core.window import Window
-from kivy.core.audio import SoundLoader
 from kivy.core.text import LabelBase
 from kivy.properties import StringProperty, NumericProperty, BooleanProperty, ListProperty
 from kivy.uix.boxlayout import BoxLayout
@@ -24,7 +25,7 @@ from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
 from kivy.uix.popup import Popup
-from kivy.uix.image import Image
+from kivy.uix.gridlayout import GridLayout
 from kivy.animation import Animation
 from kivy.metrics import dp, sp
 from kivy.utils import platform
@@ -66,7 +67,6 @@ class ChatBubble(Label):
         self.size_hint_y = None
         self.text_size = (Window.width - dp(40), None)
         self.halign = "left"
-        self valign = "top"
         self.padding = (dp(12), dp(8))
         self.markup = True
 
@@ -98,19 +98,30 @@ class MoodIndicator(Label):
         "focused": ("🎯", C.ACC2),
         "playful": ("😏", C.PRI),
         "worried": ("😰", C.RED),
-        "proud": ("🌟", C.ENERGY),
+        "proud": ("🥳", C.GREEN),
         "sleepy": ("😴", C.PRI_DIM),
     }
 
-    def set_mood(self, mood_name):
-        self.mood_name = mood_name
-        emoji, color_hex = self.MOODS_VISUAL.get(mood_name, ("😌", C.GREEN))
+    def set_mood(self, mood):
+        self.mood_name = mood
+        emoji, color = self.MOODS_VISUAL.get(mood, ("😌", C.GREEN))
         self.mood_emoji = emoji
-        # Convert hex to rgba
-        r = int(color_hex[1:3], 16) / 255
-        g = int(color_hex[3:5], 16) / 255
-        b = int(color_hex[5:7], 16) / 255
+        r = int(color[1:3], 16) / 255
+        g = int(color[3:5], 16) / 255
+        b = int(color[5:7], 16) / 255
         self.mood_color = [r, g, b, 1]
+
+
+# ── Touch Button ──────────────────────────────────────────────────────────
+class TouchButton(Button):
+    """Large touch-friendly button for Android."""
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.font_size = sp(14)
+        self.bold = True
+        self.background_color = (0.15, 0.15, 0.15, 1)
+        self.color = (1, 1, 1, 1)
+        self.border = [0, 0, 0, 0]
 
 
 # ── Main Mitsu Layout ────────────────────────────────────────────────────
@@ -126,9 +137,23 @@ class MitsuLayout(BoxLayout):
         self.current_mood_data = get_mood("chill")
         self.is_listening = False
         self.is_speaking = False
+        self._is_app_open = True
+        self._proactive_timer = None
+        self._last_user_input_at = time.time()
 
         self._build_ui()
         self._show_greeting()
+        self._start_proactive_timer()
+
+        # Bind to window resize for landscape/portrait
+        Window.bind(on_resize=self._on_resize)
+
+    def _on_resize(self, window, width, height):
+        """Handle screen rotation."""
+        # Update chat bubble text size
+        for child in self.chat_container.children:
+            if isinstance(child, ChatBubble):
+                child.text_size = (width - dp(40), None)
 
     def _load_username(self):
         try:
@@ -147,6 +172,44 @@ class MitsuLayout(BoxLayout):
         except Exception:
             pass
 
+    def _start_proactive_timer(self):
+        """Start proactive messaging timer (only when app is open)."""
+        if self._proactive_timer:
+            self._proactive_timer.cancel()
+        interval = random.randint(60, 120)
+        self._proactive_timer = threading.Timer(interval, self._maybe_proactive)
+        self._proactive_timer.daemon = True
+        self._proactive_timer.start()
+
+    def _maybe_proactive(self):
+        """Send proactive message if user has been quiet and app is open."""
+        if not self._is_app_open:
+            self._start_proactive_timer()
+            return
+        quiet_time = time.time() - self._last_user_input_at
+        if quiet_time < 60:
+            self._start_proactive_timer()
+            return
+        # 50% chance to speak
+        if random.random() < 0.50:
+            from core.emotions import get_proactive_message, get_casual_topic
+            if random.random() < 0.5:
+                msg = get_proactive_message(self.current_mood, self.username or "friend")
+            else:
+                msg = get_casual_topic(self.username or "friend")
+            Clock.schedule_once(lambda dt: self._add_chat(msg, "mitsu"), 0)
+        self._start_proactive_timer()
+
+    def on_pause(self):
+        """Called when app goes to background."""
+        self._is_app_open = False
+        return True
+
+    def on_resume(self):
+        """Called when app comes back to foreground."""
+        self._is_app_open = True
+        self._last_user_input_at = time.time()
+
     def _build_ui(self):
         # ── Header ──────────────────────────────────────────────────────
         header = BoxLayout(
@@ -161,7 +224,7 @@ class MitsuLayout(BoxLayout):
             font_size=sp(18),
             halign="left",
             valign="middle",
-            size_hint_x=0.6,
+            size_hint_x=0.5,
         ))
 
         self.mood_indicator = MoodIndicator(
@@ -176,10 +239,57 @@ class MitsuLayout(BoxLayout):
             font_size=sp(11),
             halign="right",
             valign="middle",
-            size_hint_x=0.2,
+            size_hint_x=0.3,
         )
         header.add_widget(self.state_label)
         self.add_widget(header)
+
+        # ── Quick Actions Bar (touch-friendly) ──────────────────────────
+        quick_bar = BoxLayout(
+            orientation="horizontal",
+            size_hint_y=None,
+            height=dp(50),
+            padding=[dp(8), dp(4)],
+            spacing=dp(8),
+        )
+
+        # Time button
+        time_btn = TouchButton(
+            text="🕐 Time",
+            size_hint_x=0.25,
+            background_color=(0.12, 0.12, 0.18, 1),
+        )
+        time_btn.bind(on_press=lambda x: self._quick_action("time"))
+        quick_bar.add_widget(time_btn)
+
+        # Weather button
+        weather_btn = TouchButton(
+            text="🌤️ Weather",
+            size_hint_x=0.25,
+            background_color=(0.12, 0.15, 0.12, 1),
+        )
+        weather_btn.bind(on_press=lambda x: self._quick_action("weather"))
+        quick_bar.add_widget(weather_btn)
+
+        # Joke button
+        joke_btn = TouchButton(
+            text="😄 Joke",
+            size_hint_x=0.25,
+            background_color=(0.15, 0.12, 0.12, 1),
+        )
+        joke_btn.bind(on_press=lambda x: self._quick_action("joke"))
+        quick_bar.add_widget(joke_btn)
+
+        # Camera button
+        cam_btn = TouchButton(
+            text="📷 Camera",
+            size_hint_x=0.25,
+            background_color=(0.12, 0.14, 0.16, 1),
+        )
+        cam_btn.bind(on_press=lambda x: self._on_camera())
+        quick_bar.add_widget(cam_btn)
+
+        self.add_widget(quick_bar)
 
         # ── Divider ─────────────────────────────────────────────────────
         divider = Label(
@@ -206,53 +316,72 @@ class MitsuLayout(BoxLayout):
         self.add_widget(scroll)
         self.chat_scroll = scroll
 
-        # ── Input Area ──────────────────────────────────────────────────
+        # ── Input Area (touch-friendly) ─────────────────────────────────
         input_area = BoxLayout(
             orientation="horizontal",
             size_hint_y=None,
-            height=dp(56),
+            height=dp(64),
             padding=[dp(8), dp(8)],
             spacing=dp(8),
         )
 
         self.text_input = TextInput(
             hint_text="Type a message...",
-            font_size=sp(14),
+            font_size=sp(16),
             background_color=(0.1, 0.1, 0.1, 1),
             foreground_color=(1, 1, 1, 1),
             hint_text_color=(0.4, 0.4, 0.4, 1),
             cursor_color=(1, 1, 1, 1),
             multiline=False,
-            size_hint_x=0.7,
-            padding=[dp(12), dp(10)],
+            size_hint_x=0.55,
+            padding=[dp(12), dp(12)],
             border=[0, 0, 0, 0],
         )
         self.text_input.bind(on_text_validate=self._on_send)
         input_area.add_widget(self.text_input)
 
-        self.send_btn = Button(
+        self.send_btn = TouchButton(
             text="▸",
-            font_size=sp(18),
+            font_size=sp(20),
             size_hint_x=0.15,
             background_color=(0.15, 0.15, 0.15, 1),
-            color=(1, 1, 1, 1),
-            border=[0, 0, 0, 0],
         )
         self.send_btn.bind(on_press=self._on_send)
         input_area.add_widget(self.send_btn)
 
-        self.voice_btn = Button(
+        self.voice_btn = TouchButton(
             text="🎤",
-            font_size=sp(16),
+            font_size=sp(18),
             size_hint_x=0.15,
             background_color=(0.1, 0.15, 0.1, 1),
             color=(0, 1, 0.5, 1),
-            border=[0, 0, 0, 0],
         )
         self.voice_btn.bind(on_press=self._on_voice)
         input_area.add_widget(self.voice_btn)
 
+        self.camera_btn = TouchButton(
+            text="📷",
+            font_size=sp(18),
+            size_hint_x=0.15,
+            background_color=(0.1, 0.1, 0.15, 1),
+            color=(0.5, 0.8, 1, 1),
+        )
+        self.camera_btn.bind(on_press=self._on_camera)
+        input_area.add_widget(self.camera_btn)
+
         self.add_widget(input_area)
+
+    def _quick_action(self, action):
+        """Handle quick action buttons."""
+        if action == "time":
+            response = execute_skill("datetime", query="now")
+            self._add_chat(f"🕐 {response}", "mitsu")
+        elif action == "weather":
+            response = execute_skill("weather")
+            self._add_chat(f"🌤️ {response}", "mitsu")
+        elif action == "joke":
+            response = execute_skill("joke")
+            self._add_chat(f"😄 {response}", "mitsu")
 
     def _add_chat(self, text, sender="mitsu"):
         bubble = ChatBubble(text=text, sender=sender)
@@ -269,13 +398,14 @@ class MitsuLayout(BoxLayout):
         else:
             self._add_chat("[color=#00ff88]SYS:[/color] Hey! I'm Mitsu. What's your name?", "system")
 
-        self._add_chat("[color=#00ff88]SYS:[/color] Tap 🎤 for voice or type a message.", "system")
+        self._add_chat("[color=#00ff88]SYS:[/color] Tap 🎤 for voice, 📷 for camera, or type a message.", "system")
 
     def _on_send(self, *args):
         text = self.text_input.text.strip()
         if not text:
             return
         self.text_input.text = ""
+        self._last_user_input_at = time.time()
 
         # Check if this is a name request
         if not self.username and not text.startswith("/"):
@@ -333,6 +463,17 @@ class MitsuLayout(BoxLayout):
                 "• /mood — current mood\n"
                 "• /name — change your name\n"
                 "• /clear — clear chat\n"
+                "• /photo — take a photo\n"
+                "• /video — record a video\n"
+                "• /audio — record audio\n"
+                "• /contacts — get contacts\n"
+                "• /sms <number> <msg> — send SMS\n"
+                "• /location — get location\n"
+                "• /wifi — WiFi info\n"
+                "• /battery — battery status\n"
+                "• /weather — get weather\n"
+                "• /joke — tell a joke\n"
+                "• /fact — fun fact\n"
                 "• /help — this message"
             )
 
@@ -363,27 +504,72 @@ class MitsuLayout(BoxLayout):
             Clock.schedule_once(lambda dt: self._clear_chat(), 0)
             return "Chat cleared."
 
+        # Photo
+        if lower in ("photo", "/photo", "take photo", "camera", "take a photo"):
+            self._take_photo()
+            return "Taking photo..."
+
+        # Video
+        if lower in ("video", "/video", "record video", "take video"):
+            self._record_video()
+            return "Recording video..."
+
+        # Audio
+        if lower in ("audio", "/audio", "record audio", "voice recording"):
+            self._record_audio()
+            return "Recording audio..."
+
+        # Contacts
+        if lower in ("contacts", "/contacts", "get contacts", "show contacts"):
+            return execute_skill("contacts")
+
+        # SMS
+        if lower.startswith("/sms") or lower.startswith("sms"):
+            parts = text.split(maxsplit=2)
+            if len(parts) >= 3:
+                return execute_skill("sms", number=parts[1], message=parts[2])
+            return "Usage: /sms <number> <message>"
+
+        # Call
+        if lower.startswith("/call") or lower.startswith("call"):
+            parts = text.split(maxsplit=1)
+            if len(parts) >= 2:
+                return execute_skill("call", number=parts[1])
+            return "Usage: /call <number>"
+
+        # Location
+        if lower in ("location", "/location", "where am i", "my location"):
+            return execute_skill("location")
+
+        # WiFi
+        if lower in ("wifi", "/wifi", "wifi info", "network"):
+            return execute_skill("wifi")
+
+        # Battery
+        if lower in ("battery", "/battery", "battery status", "power"):
+            return execute_skill("battery")
+
+        # Weather
+        if lower.startswith("weather") or lower.startswith("/weather"):
+            city = text.split(maxsplit=1)[1] if len(text.split()) > 1 else ""
+            return execute_skill("weather", city=city)
+
         # Jokes
         if lower in ("joke", "tell me a joke", "/joke"):
-            jokes = [
-                "Why do programmers prefer dark mode? Because light attracts bugs!",
-                "Why was the JavaScript developer sad? Because he didn't Node how to Express himself!",
-                "What's a programmer's favorite hangout place? Foo Bar!",
-                "Why do Java developers wear glasses? Because they can't C#!",
-                "How many programmers does it take to change a light bulb? None — that's a hardware problem!",
-            ]
-            return random.choice(jokes)
+            return execute_skill("joke")
 
         # Fun facts
         if lower in ("fact", "fun fact", "/fact", "random fact"):
-            facts = [
-                "Honey never spoils. Archaeologists found 3000-year-old honey in Egyptian tombs that was still edible.",
-                "Octopuses have three hearts and blue blood.",
-                "A day on Venus is longer than its year.",
-                "Bananas are berries, but strawberries aren't.",
-                "The first computer bug was an actual bug — a moth found in a Harvard computer in 1947.",
-            ]
-            return random.choice(facts)
+            return execute_skill("fact")
+
+        # Calculator
+        if lower.startswith("calc") or lower.startswith("/calc"):
+            expr = text.split(maxsplit=1)[1] if len(text.split()) > 1 else "0"
+            return execute_skill("calculator", expression=expr)
+
+        # Flashlight
+        if lower in ("flashlight", "/flashlight", "torch", "/torch"):
+            return execute_skill("flashlight", state="on")
 
         return None  # Not a built-in command, use AI
 
@@ -421,6 +607,105 @@ class MitsuLayout(BoxLayout):
         self.text_input.text = text
         self._on_send()
 
+    def _on_camera(self, *args):
+        """Handle camera button press - show options for photo or video."""
+        content = BoxLayout(orientation="vertical", padding=dp(16), spacing=dp(12))
+
+        content.add_widget(Label(
+            text="Choose an option:",
+            font_size=sp(16),
+            size_hint_y=None,
+            height=dp(30),
+        ))
+
+        # Photo button
+        photo_btn = TouchButton(
+            text="📷 Take Photo",
+            size_hint_y=None,
+            height=dp(60),
+            background_color=(0.15, 0.2, 0.3, 1),
+        )
+        photo_btn.bind(on_press=lambda x: self._take_photo())
+        content.add_widget(photo_btn)
+
+        # Video button
+        video_btn = TouchButton(
+            text="🎥 Record Video (5s)",
+            size_hint_y=None,
+            height=dp(60),
+            background_color=(0.2, 0.15, 0.15, 1),
+        )
+        video_btn.bind(on_press=lambda x: self._record_video())
+        content.add_widget(video_btn)
+
+        # Audio button
+        audio_btn = TouchButton(
+            text="🎙️ Record Audio (10s)",
+            size_hint_y=None,
+            height=dp(60),
+            background_color=(0.15, 0.15, 0.2, 1),
+        )
+        audio_btn.bind(on_press=lambda x: self._record_audio())
+        content.add_widget(audio_btn)
+
+        # Cancel button
+        cancel_btn = TouchButton(
+            text="Cancel",
+            size_hint_y=None,
+            height=dp(50),
+            background_color=(0.2, 0.2, 0.2, 1),
+            color=(0.7, 0.7, 0.7, 1),
+        )
+
+        popup = Popup(
+            title="Camera",
+            content=content,
+            size_hint=(0.85, 0.6),
+            auto_dismiss=True,
+        )
+        cancel_btn.bind(on_press=popup.dismiss)
+        content.add_widget(cancel_btn)
+        popup.open()
+
+    def _take_photo(self):
+        """Take a photo using the device camera."""
+        self._add_chat("[color=#00ff88]SYS:[/color] 📷 Taking photo...", "system")
+        threading.Thread(target=self._do_photo, daemon=True).start()
+
+    def _do_photo(self):
+        try:
+            from core.mobile_skills import execute_skill
+            result = execute_skill("take_photo")
+            Clock.schedule_once(lambda dt: self._add_chat(f"📷 {result}", "mitsu"), 0)
+        except Exception as e:
+            Clock.schedule_once(lambda dt: self._add_chat(f"Error: {e}", "system"), 0)
+
+    def _record_video(self):
+        """Record a video."""
+        self._add_chat("[color=#00ff88]SYS:[/color] 🎥 Recording video (5s)...", "system")
+        threading.Thread(target=self._do_video, daemon=True).start()
+
+    def _do_video(self):
+        try:
+            from core.mobile_skills import execute_skill
+            result = execute_skill("record_video", duration=5)
+            Clock.schedule_once(lambda dt: self._add_chat(f"🎥 {result}", "mitsu"), 0)
+        except Exception as e:
+            Clock.schedule_once(lambda dt: self._add_chat(f"Error: {e}", "system"), 0)
+
+    def _record_audio(self):
+        """Record audio."""
+        self._add_chat("[color=#00ff88]SYS:[/color] 🎙️ Recording audio (10s)...", "system")
+        threading.Thread(target=self._do_audio, daemon=True).start()
+
+    def _do_audio(self):
+        try:
+            from core.mobile_skills import execute_skill
+            result = execute_skill("record_audio", duration=10)
+            Clock.schedule_once(lambda dt: self._add_chat(f"🎙️ {result}", "mitsu"), 0)
+        except Exception as e:
+            Clock.schedule_once(lambda dt: self._add_chat(f"Error: {e}", "system"), 0)
+
     def _set_state(self, state):
         states = {
             "idle": ("● ONLINE", "#00ff88"),
@@ -436,13 +721,27 @@ class MitsuLayout(BoxLayout):
 class MitsuApp(App):
     def build(self):
         Window.clearcolor = (0.04, 0.04, 0.04, 1)
-        Window.size = (400, 700)
-        return MitsuLayout()
+        # Don't set fixed size - auto-detect from device
+        self.layout = MitsuLayout()
+        return self.layout
 
     def on_pause(self):
+        """App going to background."""
+        if hasattr(self, 'layout'):
+            self.layout.on_pause()
         return True
 
     def on_resume(self):
+        """App coming back to foreground."""
+        if hasattr(self, 'layout'):
+            self.layout.on_resume()
+
+    def on_start(self):
+        """App started."""
+        pass
+
+    def on_stop(self):
+        """App stopping."""
         pass
 
 

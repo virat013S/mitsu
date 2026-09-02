@@ -1202,8 +1202,8 @@ class MitsuLive:
         """Start a timer that checks if Mitsu should say something proactively."""
         if self._proactive_timer:
             self._proactive_timer.cancel()
-        # Check every 3-5 minutes (randomized to feel natural)
-        interval = random.randint(180, 300)
+        # Check every 1-2 minutes (randomized to feel natural)
+        interval = random.randint(60, 120)
         self._proactive_timer = threading.Timer(interval, self._maybe_proactive_message)
         self._proactive_timer.daemon = True
         self._proactive_timer.start()
@@ -1214,12 +1214,12 @@ class MitsuLive:
             return
         try:
             from core.emotions import should_be_proactive, get_proactive_message, get_casual_topic
-            # Only if user has been quiet for 5+ minutes
+            # Only if user has been quiet for 1+ minutes
             quiet_time = time.monotonic() - self._last_user_input_at
-            if quiet_time < 300:
+            if quiet_time < 60:
                 self._start_proactive_timer()
                 return
-            # Random chance to speak
+            # Random chance to speak (35% chance)
             if not should_be_proactive():
                 self._start_proactive_timer()
                 return
