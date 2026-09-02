@@ -498,24 +498,39 @@ Want to make Mitsu better? Here's how:
 
 ## Android Version (APK)
 
-Mitsu also works on Android! The mobile version includes all the core features — chat, voice, emotions, file management, weather, jokes, and more.
+Mitsu also works on Android! The mobile version includes all the core features — chat, voice, emotions, camera, voice recording, memory, and more.
 
 ### What Works on Android
 
 | Feature | Status |
 |---------|--------|
-| **Text Chat** | Full support — Gemini, Ollama, OpenRouter |
+| **Setup Screen** | Username + voice picker on first launch |
+| **Voice Selection** | 8 voices (male/female, US/UK/AU accents) |
+| **Text Chat** | Full support — Gemini or Local mode |
 | **Voice Input** | Speech-to-text via Android mic |
 | **Voice Output** | Text-to-speech with mood-based pitch |
 | **Emotions** | All 7 moods with voice changes |
 | **Auto-Theming** | UI colors change with mood |
+| **Camera** | Take photos with device camera |
+| **Video Recording** | Record short videos (5s) |
+| **Audio Recording** | Record voice memos (10s) |
+| **Conversation Memory** | Remembers past sessions, references old topics |
 | **File Management** | Read, write, list files on device |
 | **Weather** | Real-time weather for any city |
 | **Calculator** | Math evaluation |
 | **Jokes & Facts** | Random jokes and fun facts |
-| **Device Info** | Battery status, OS info |
+| **Device Info** | Battery status, OS info, WiFi, location |
+| **Contacts** | Read and call contacts |
+| **SMS** | Send text messages |
 | **Web Search** | DuckDuckGo search |
 | **Date/Time** | Current time, date, day of week |
+| **Flashlight** | Toggle device flashlight |
+| **Clipboard** | Copy/paste text |
+| **Alarm & Timer** | Set alarms and timers |
+| **Touch-Friendly UI** | Large buttons, easy to tap |
+| **Landscape Support** | Works in portrait and landscape |
+| **Proactive Messaging** | 50% chance to speak when quiet (only when app is open) |
+| **Assistant Mode** | Can be set as default Android assistant |
 
 ### What Doesn't Work on Android
 
@@ -528,6 +543,32 @@ Mitsu also works on Android! The mobile version includes all the core features �
 | Deep Research | Background browser mode not available |
 | Presentations | PowerPoint creation not supported |
 | Email (OAuth) | Gmail OAuth flow different on mobile |
+| Ollama (Local) | Not supported on Android — use Gemini or Local mode |
+
+### Android Providers
+
+| Provider | Description | Internet |
+|----------|-------------|----------|
+| **Gemini (Cloud)** | Best quality, uses Google's Gemini API | Required |
+| **Local** | Basic responses, works offline | Not required |
+
+> **Note:** Ollama is NOT supported on Android. Use Gemini for best results or Local for offline use.
+
+### First-Time Setup (Android)
+
+When you first open the app:
+
+1. **Enter your name** — Mitsu will use this to talk to you
+2. **Pick a voice** — 8 options to choose from:
+   - Aria (Female, US — Friendly)
+   - Guy (Male, US — Casual)
+   - Jenny (Female, US — Warm)
+   - Tony (Male, US — Energetic)
+   - Sonia (Female, UK — Elegant)
+   - Ryan (Male, UK — Calm)
+   - Natasha (Female, AU — Bright)
+   - William (Male, AU — Deep)
+3. **Tap "Start Chatting"** — you're good to go!
 
 ### Building the APK
 
@@ -572,16 +613,33 @@ Check the [Releases page](https://github.com/virat013S/mitsu/releases) for pre-b
 1. Download the APK file
 2. Enable "Install from unknown sources" in Android Settings > Security
 3. Open the APK file
-4. Grant permissions (microphone, storage)
-5. Enter your Gemini API key
+4. Grant permissions (microphone, storage, camera, contacts)
+5. Enter your name and pick a voice
 6. Start chatting!
 
 ### Android Requirements
 
-- **Android 7.0+** (API 24)
+- **Android 5.0+** (API 21) — supports Lollipop through Android 17
 - **RAM:** 1GB free
 - **Storage:** ~50MB for app + dependencies
-- **Internet:** Required for API calls
+- **Internet:** Required for Gemini mode, not for Local mode
+- **Architectures:** arm64-v8a, armeabi-v7a, x86, x86_64
+
+### Supported Android OS
+
+| Brand | OS Skin | Compatible |
+|-------|---------|------------|
+| **Vivo** | OriginOS, FuntouchOS | ✅ |
+| **Samsung** | One UI, TouchWiz | ✅ |
+| **Xiaomi** | MIUI, HyperOS | ✅ |
+| **OnePlus** | OxygenOS | ✅ |
+| **Google** | Pixel (stock Android) | ✅ |
+| **Huawei** | EMUI | ✅ |
+| **OPPO** | ColorOS | ✅ |
+| **Realme** | Realme UI | ✅ |
+| **Motorola** | MyUX | ✅ |
+| **Nothing** | Nothing OS | ✅ |
+| **Custom ROMs** | LineageOS, PixelOS, etc. | ✅ |
 
 ### Mobile vs Desktop
 
@@ -591,10 +649,14 @@ Check the [Releases page](https://github.com/virat013S/mitsu/releases) for pre-b
 | Desktop Control | Full | N/A |
 | Browser Automation | Full | N/A |
 | File Management | Full | Basic (device storage) |
+| Camera | Via OpenCV | Native Android camera |
+| Voice Recording | Via OpenCV | Native Android recorder |
+| Memory | Full | Full (conversation history) |
 | Emotions | Full | Full |
 | Auto-Theming | Full | Full |
-| Proactive Messaging | Full | Planned |
+| Proactive Messaging | Full | 50% chance (when app open) |
 | Casual Friend Mode | Full | Full |
+| Setup Screen | Name + gender | Name + voice picker |
 | Presentations | Full | N/A |
 | Deep Research | Full | N/A |
 | Weather | Full | Full |
