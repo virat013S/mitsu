@@ -1234,16 +1234,105 @@ class MitsuLive:
         self._shutdown_requested = threading.Event()
         self._tour_active = False
 
+    def _current_provider(self) -> str:
+        """Active chat backend: env override, then core.providers fallback."""
+        raw = str(os.environ.get("MITSU_PROVIDER", "") or "").strip().lower()
+        if raw in ("gemini", "ollama", "openrouter"):
+            return raw
+        try:
+            from core.providers import get_provider
+            return get_provider()
+        except Exception:
+            return "gemini"
+
+    def _uses_live_session(self) -> bool:
+        """Gemini replies over Live; ollama/openrouter reply without a session."""
+        return self._current_provider() == "gemini"
+
+    def _reply_via_provider(self, text: str):
+        """Text reply for non-Gemini providers (ollama / openrouter)."""
+        from core.providers import chat_with_provider, speak as providers_speak
+
+        provider = self._current_provider()
+        history = getattr(self, "_provider_history", None)
+        if not isinstance(history, list):
+            history = []
+            self._provider_history = history
+        if not history or history[0].get("role") != "system":
+            history.insert(0, {"role": "system", "content": _load_system_prompt()})
+        history.append({"role": "user", "content": text})
+        # Bound context so long sessions cannot grow without limit.
+        if len(history) > 41:
+            history[:] = [history[0]] + history[-40:]
+
+        try:
+            self.ui.set_state("THINKING")
+            reply = chat_with_provider(list(history), provider=provider, voice=False)
+            reply = (reply or "").strip()
+            if reply:
+                history.append({"role": "assistant", "content": reply})
+                self.ui.write_log(f"Mitsu: {reply}")
+                self.ui.show_subtitle(reply)
+                if not getattr(self.ui, "muted", False):
+                    try:
+                        if self._tts_engine and self._ext_tts_provider and self._ext_tts_provider != "gemini":
+                            self._tts_engine.speak(reply)
+                        else:
+                            providers_speak(reply)
+                    except Exception:
+                        pass
+            else:
+                self.ui.write_log(f"ERR: {provider} returned no reply.")
+        except Exception as exc:
+            self.ui.write_log(f"ERR: {provider} reply failed: {exc}")
+        finally:
+            # Always leave THINKING — muted only suppresses speech, not state.
+            self.ui.set_state("LISTENING")
+
     def _on_text_command(self, text: str):
-        if not self._loop or not self.session:
+        if not self._uses_live_session():
+            # Ollama/OpenRouter answer without a Gemini Live session.
+            threading.Thread(
+                target=self._reply_via_provider,
+                args=(str(text or "").strip(),),
+                daemon=True,
+            ).start()
             return
-        asyncio.run_coroutine_threadsafe(self.send_text(text), self._loop)
+        if not self._loop or not self.session:
+            try:
+                self.ui.write_log(
+                    "ERR: Not connected yet — wait for 'SYS: MITSU online.' then retry."
+                )
+            except Exception:
+                print("[MITSU] Not connected — session/loop not ready for text.")
+            return
+        try:
+            asyncio.run_coroutine_threadsafe(self.send_text(text), self._loop)
+        except Exception as exc:
+            try:
+                self.ui.write_log(f"ERR: Could not queue message: {exc}")
+            except Exception:
+                print(f"[MITSU] Could not queue message: {exc}")
 
     async def send_text(self, text: str) -> bool:
         """Send a text turn from either the desktop callback or a web client."""
+        if not self._uses_live_session():
+            await asyncio.to_thread(self._reply_via_provider, str(text or "").strip())
+            return True
         if not self.session:
+            try:
+                self.ui.write_log("ERR: No live session — message not sent.")
+            except Exception:
+                print("[MITSU] No live session — message not sent.")
             return False
-        self._current_input_transcript = str(text or "").strip()
+        try:
+            self._current_input_transcript = str(text or "").strip()
+        except Exception as exc:
+            try:
+                self.ui.write_log(f"ERR: Bad message payload: {exc}")
+            except Exception:
+                print(f"[MITSU] Bad message payload: {exc}")
+            return False
         if not self._current_input_transcript:
             return False
         self._last_input_transcript = self._current_input_transcript
@@ -1266,10 +1355,17 @@ class MitsuLive:
                 "[VERIFIED LOCAL SELF-SHUTDOWN] The user explicitly asked MITSU to quit. "
                 f'Say exactly: "{SELF_QUIT_GOODBYE}" Do not call a tool and say nothing else.'
             )
-        await self.session.send_client_content(
-            turns={"parts": [{"text": outgoing_text}]},
-            turn_complete=True,
-        )
+        try:
+            await self.session.send_client_content(
+                turns={"parts": [{"text": outgoing_text}]},
+                turn_complete=True,
+            )
+        except Exception as exc:
+            try:
+                self.ui.write_log(f"ERR: Send failed: {exc}")
+            except Exception:
+                print(f"[MITSU] Send failed: {exc}")
+            return False
         return True
 
     async def send_audio_chunk(
@@ -1995,6 +2091,34 @@ class MitsuLive:
                 stream.close()
 
     async def run(self):
+        provider = self._current_provider()
+        if provider != "gemini":
+            # Ollama / OpenRouter: no Live socket — mark online and answer via chat_with_provider.
+            self.ui.write_log(f"SYS: Provider ready: {provider}")
+            self.ui.set_state("LISTENING")
+            self.ui.write_log("SYS: MITSU online.")
+            if not self.cloud_safe:
+                try:
+                    mitsu_status.write_status({
+                        "state": "online",
+                        "voice": self._get_current_voice(),
+                        "pid": os.getpid(),
+                    })
+                except Exception:
+                    pass
+            start_time = time.time()
+            while not self._shutdown_requested.is_set():
+                if self.runtime_limit_seconds is not None:
+                    if time.time() - start_time >= float(self.runtime_limit_seconds):
+                        print(f"[MITSU] ⏱️ Runtime limit reached ({self.runtime_limit_seconds}s). Exiting.")
+                        try:
+                            mitsu_status.write_status({"state": "expired"})
+                        except Exception:
+                            pass
+                        os._exit(0)
+                await asyncio.sleep(0.25)
+            return
+
         api_key = self._api_key or _get_api_key()
         client = genai.Client(
             api_key=api_key,
@@ -2164,20 +2288,27 @@ def _startup_banner() -> None:
 
 
 def _select_provider() -> str:
-    """Ask user to choose AI provider. Returns provider name."""
+    """Ask user to choose AI provider. Returns provider name.
+    Pre-selects the saved provider so Enter accepts the last working mode."""
+    saved = _load_provider_config().get("provider", "")
+    saved = saved if saved in ("gemini", "ollama", "openrouter") else ""
     print("  How would you like Mitsu to run?\n")
     print("    [1] Cloud Mode (Gemini API Key)       — best voice quality")
     print("    [2] Local Mode (Gemma 3 1B via Ollama) — free, offline, private")
     print("    [3] OpenRouter (Free Tier Models)      — free, needs internet\n")
+    if saved:
+        print(f"    Saved mode: {saved}  (press Enter to keep)\n")
 
+    provider_map = {"1": "gemini", "2": "ollama", "3": "openrouter"}
     while True:
         try:
-            choice = input("  Choose mode [1/2/3]: ").strip()
+            raw = input("  Choose mode [1/2/3]: ").strip()
         except (EOFError, KeyboardInterrupt):
-            choice = "2"
-        if choice in ("1", "2", "3"):
-            provider_map = {"1": "gemini", "2": "ollama", "3": "openrouter"}
-            return provider_map[choice]
+            return saved or "ollama"
+        if not raw and saved:
+            return saved
+        if raw in provider_map:
+            return provider_map[raw]
         print("  Please enter 1, 2, or 3.")
 
 
@@ -2323,10 +2454,7 @@ def main():
     _sync_username_stores()
     username = _current_user_name() or username
 
-    # Check saved provider or ask
-    saved = _load_provider_config()
-    provider = saved.get("provider", "")
-    # Always ask for provider on startup
+    # Ask on startup; Enter keeps the saved mode (local needs no API key).
     provider = _select_provider()
     if not _setup_provider(provider):
         print("  Setup incomplete. You can reconfigure by deleting ~/.mitsu/provider.json")

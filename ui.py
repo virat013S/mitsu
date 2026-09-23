@@ -43,6 +43,25 @@ API_FILE   = CONFIG_DIR / "api_keys.json"
 FONT_DIR   = BASE_DIR / "assets" / "fonts"
 UI_SETTINGS_FILE = Path.home() / ".mitsu" / "config" / "settings.json"
 LAYOUT_SETTINGS_FILE = Path.home() / ".mitsu" / "config" / "layout_settings.json"
+PROVIDER_CONFIG_FILE = Path.home() / ".mitsu" / "provider.json"
+
+
+def _load_provider_preference() -> str:
+    """Saved AI provider: provider.json, then api_keys.json, then env."""
+    for source in (
+        lambda: json.loads(PROVIDER_CONFIG_FILE.read_text(encoding="utf-8"))
+        if PROVIDER_CONFIG_FILE.exists() else {},
+        lambda: json.loads(API_FILE.read_text(encoding="utf-8"))
+        if API_FILE.exists() else {},
+    ):
+        try:
+            value = str((source() or {}).get("provider", "")).strip().lower()
+        except Exception:
+            value = ""
+        if value in ("gemini", "ollama", "openrouter"):
+            return value
+    env = os.environ.get("MITSU_PROVIDER", "").strip().lower()
+    return env if env in ("gemini", "ollama", "openrouter") else "ollama"
 
 # Each profile changes both cadence and rendering density.  Keeping this data
 # centralized makes the Settings UI, the renderer, and MITSU voice commands
@@ -884,7 +903,7 @@ class FocusDialogueWidget(QWidget):
         self._channel_lbl.setStyleSheet(
             f"color: {C.TEXT_MED}; background: transparent; letter-spacing: 1px;"
         )
-        self._live_lbl.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
+        self._live_lbl.setStyleSheet(f"color: {C.ENERGY}; background: transparent;")
         self._speaker_lbl.setStyleSheet(f"color: {C.PRI}; background: transparent;")
         self._message_lbl.setStyleSheet(f"color: {C.WHITE}; background: transparent;")
         self._input.setStyleSheet(f"""
@@ -1282,13 +1301,15 @@ class ToolProgressWidget(QWidget):
 
 
 # ---------------------------------------------------------------------------
-# CompactModeWidget — floating MITSU badge
+# CompactModeWidget — floating mini synapse cluster
 # ---------------------------------------------------------------------------
 
 class CompactModeWidget(QWidget):
-    """Small floating MITSU badge for compact mode."""
+    """Floating mini synapse cluster for compact mode."""
 
     expand_requested = pyqtSignal()
+
+    _NODE_COUNT = 14
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1301,9 +1322,22 @@ class CompactModeWidget(QWidget):
         self.setFixedSize(80, 80)
 
         self._tick = 0
-        self._ring_angle = 0.0
+        self._rotation = 0.0
         self._state = "LISTENING"
         self._drag_pos = None
+
+        # Mini cluster: [angle, radius, size, bright, phase]
+        self._nodes: list[list[float]] = []
+        for i in range(self._NODE_COUNT):
+            ang = (i / self._NODE_COUNT) * math.tau + random.uniform(-0.2, 0.2)
+            rad = random.uniform(0.28, 0.78) if i % 3 else random.uniform(0.10, 0.28)
+            self._nodes.append([
+                ang, rad,
+                random.uniform(1.0, 2.6),
+                random.uniform(0.35, 0.95),
+                random.uniform(0, math.tau),
+            ])
+        self._packets: list[list[float]] = []  # [node_i, node_j, t, speed]
 
         ThemeManager.add_listener(lambda _: self.update())
         self._tmr = QTimer(self)
@@ -1313,57 +1347,123 @@ class CompactModeWidget(QWidget):
     def set_state(self, state: str):
         self._state = state
 
+    def _is_active(self) -> bool:
+        return self._state in ("SPEAKING", "THINKING", "PROCESSING")
+
     def _step(self):
         self._tick += 1
-        speed = 2.0 if self._state in ("SPEAKING", "THINKING") else 0.5
-        self._ring_angle = (self._ring_angle + speed) % 360
+        is_active = self._is_active()
+        spd = 0.045 if is_active else 0.018
+        self._rotation = (self._rotation + spd) % math.tau
+
+        for nd in self._nodes:
+            nd[0] += 0.01 if is_active else 0.004
+            nd[4] += 0.12 if is_active else 0.05
+            target = random.uniform(0.55, 1.0) if is_active else random.uniform(0.30, 0.75)
+            if self._state == "MUTED":
+                target = random.uniform(0.10, 0.28)
+            nd[3] += (target - nd[3]) * 0.08
+
+        if is_active and self._tick % 18 == 0 and len(self._packets) < 4:
+            a = random.randrange(self._NODE_COUNT)
+            b = random.randrange(self._NODE_COUNT)
+            if a != b:
+                self._packets.append([a, b, 0.0, random.uniform(0.03, 0.06)])
+
+        self._packets = [
+            [pk[0], pk[1], pk[2] + pk[3], pk[3]]
+            for pk in self._packets if pk[2] < 1.0
+        ]
         self.update()
+
+    def _node_xy(self, nd, cx, cy, r):
+        ang = nd[0] + self._rotation
+        rad = nd[1] * r
+        return cx + math.cos(ang) * rad, cy + math.sin(ang) * rad
 
     def paintEvent(self, _):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         W, H = self.width(), self.height()
-        cx, cy = W / 2, H / 2
-        r = min(W, H) / 2 - 4
+        cx, cy = W / 2.0, H / 2.0
+        r = min(W, H) / 2.0 - 4
+        is_active = self._is_active()
 
-        # Soft disc
-        grad = QRadialGradient(QPointF(cx - 4, cy - 4), r)
-        grad.setColorAt(0.0, qcol(C.DARK2, 240))
-        grad.setColorAt(1.0, qcol(C.DARK, 235))
+        # Soft backdrop
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QBrush(grad))
+        p.setBrush(QBrush(qcol(C.DARK, 220)))
         p.drawEllipse(QPointF(cx, cy), r, r)
-
-        # Rim
-        is_active = self._state in ("SPEAKING", "THINKING", "PROCESSING")
-        rim_a = 200 if is_active else 110
-        p.setPen(QPen(qcol(C.PRI, rim_a), 1.6))
+        p.setPen(QPen(qcol(C.PRI, 90), 1.5))
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawEllipse(QPointF(cx, cy), r, r)
 
-        # Orbiting accent arc (single, subtle — not a reactor)
-        rect = QRectF(cx - r + 5, cy - r + 5, (r - 5) * 2, (r - 5) * 2)
-        p.setPen(QPen(qcol(C.ENERGY, 190 if is_active else 90), 2))
-        start = int(self._ring_angle * 16)
-        p.drawArc(rect, start, 70 * 16)
+        pts = [self._node_xy(nd, cx, cy, r) for nd in self._nodes]
 
-        # Monogram
-        p.setFont(QFont("Arial", max(10, int(r * 0.7)), QFont.Weight.Bold))
-        p.setPen(QPen(qcol(C.WHITE, 230)))
-        p.drawText(QRectF(0, 0, W, H), int(Qt.AlignmentFlag.AlignCenter), "M")
+        # Edges between nearby cluster nodes
+        for i in range(self._NODE_COUNT):
+            for j in range(i + 1, self._NODE_COUNT):
+                x1, y1 = pts[i]
+                x2, y2 = pts[j]
+                dist = math.hypot(x2 - x1, y2 - y1)
+                if dist > r * 0.72:
+                    continue
+                mid = (self._nodes[i][3] + self._nodes[j][3]) * 0.5
+                a = int(70 * mid * (1.3 if is_active else 1.0))
+                a = max(0, min(180, a))
+                if a < 6:
+                    continue
+                p.setPen(QPen(qcol(C.PRI, a), 0.7))
+                p.drawLine(QPointF(x1, y1), QPointF(x2, y2))
 
-        # State pip
-        pip = QPointF(cx + r * 0.62, cy - r * 0.62)
-        pip_color = {
-            "LISTENING": C.GREEN,
-            "SPEAKING": C.ENERGY,
-            "THINKING": C.ACC2,
-            "MUTED": C.RED,
-        }.get(self._state, C.TEXT_MED)
+        # Packets
+        for pk in self._packets:
+            i, j, t = int(pk[0]), int(pk[1]), pk[2]
+            if i >= len(pts) or j >= len(pts):
+                continue
+            fade = math.sin(t * math.pi)
+            pa = int(200 * fade)
+            if pa < 12:
+                continue
+            x = pts[i][0] + (pts[j][0] - pts[i][0]) * t
+            y = pts[i][1] + (pts[j][1] - pts[i][1]) * t
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(qcol(C.ENERGY, pa)))
+            p.drawEllipse(QPointF(x, y), 2.0, 2.0)
+
+        # Nodes
+        for k, nd in enumerate(self._nodes):
+            x, y = pts[k]
+            breath = 0.65 + 0.35 * math.sin(nd[4])
+            a = int(255 * nd[3] * breath * (0.75 if is_active else 0.55))
+            a = max(0, min(255, a))
+            rad = nd[2] * (1.2 if is_active else 1.0)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(qcol(C.PRI, max(0, a // 5))))
+            p.drawEllipse(QPointF(x, y), rad * 2.2, rad * 2.2)
+            p.setBrush(QBrush(qcol(C.ENERGY, a)))
+            p.drawEllipse(QPointF(x, y), rad, rad)
+
+        # Center pip
+        glow_a = 160 if is_active else 70
+        grad = QRadialGradient(QPointF(cx, cy), r * 0.28)
+        grad.setColorAt(0, qcol(C.ENERGY, glow_a))
+        grad.setColorAt(1, qcol(C.PRI, 0))
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QBrush(qcol(pip_color, 230)))
-        p.drawEllipse(pip, 4, 4)
+        p.setBrush(QBrush(grad))
+        p.drawEllipse(QPointF(cx, cy), r * 0.28, r * 0.28)
+        p.setBrush(QBrush(qcol(C.ENERGY, 200)))
+        p.drawEllipse(QPointF(cx, cy), 2.4, 2.4)
+
+        # State pip at bottom
+        state_col = {
+            "LISTENING": C.ACC2, "SPEAKING": C.ENERGY,
+            "THINKING": C.PRI, "PROCESSING": C.ACC,
+            "MUTED": C.TEXT_DIM,
+        }.get(self._state, C.TEXT_DIM)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(qcol(state_col, 200)))
+        p.drawEllipse(QPointF(cx, cy + r - 8), 3.2, 3.2)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -1382,7 +1482,6 @@ class CompactModeWidget(QWidget):
 
     def mouseDoubleClickEvent(self, event):
         self.expand_requested.emit()
-
 
 # ---------------------------------------------------------------------------
 # Popup System - Contextual holographic popups orbiting the AI Core
@@ -2135,15 +2234,19 @@ class AIActivityConfig:
 
 class HudCanvas(QWidget):
     """
-    MITSU Core — original centerpiece.
-    Soft breathing orb, monogram, status ring, speaking waveform.
-    Not a HUD, not a reactor — MITSU's own visual identity.
+    Neural Synapse web — original always-on field.
+    Nodes drift on shallow orbits, edges breathe, packets pulse along synapses.
+    State only modulates intensity and speed; the web never freezes.
     """
+
+    _NODE_COUNT = 110
+    _SHELLS = 4
+    _MAX_PACKETS = 18
 
     def __init__(self, face_path: str, parent=None, config: HudConfig = None):
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent)
-        self.setMinimumSize(280, 280)
+        self.setMinimumSize(300, 300)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         self.config = config or HudConfig()
@@ -2152,37 +2255,80 @@ class HudCanvas(QWidget):
         self.state    = "INITIALISING"
 
         self._tick       = 0
-        self._scale      = 1.0
-        self._tgt_scale  = 1.0
         self._brightness = 0.55
         self._tgt_bright = 0.55
-        self._breath     = 0.0
-        self._ring_angle = 0.0
-        self._pulse      = 0.0
-        self._face_px    = None
-        self._load_face(face_path)
+        self._last_t     = time.time()
+        self._blink      = True
+        self._blink_tick = 0
+        self._rotation   = 0.0
+        self._drift_t    = random.uniform(0, math.tau)
 
-        # Ambient drift points — sparse, calm
-        self._motes = []
-        for _ in range(48):
-            self._motes.append([
-                random.uniform(0.05, 0.95),
-                random.uniform(0.05, 0.95),
-                random.uniform(0.6, 2.2),
-                random.uniform(0, 2 * math.pi),
-                random.uniform(0.2, 0.7),
+        # Nodes: [x, y, r_px base, bright, phase, shell, vx, vy]
+        # Normalized coords in [-1, 1]; shells bias radial distance.
+        self._nodes: list[list[float]] = []
+        shell_r = (0.18, 0.38, 0.58, 0.78)
+        for i in range(self._NODE_COUNT):
+            shell = i % self._SHELLS
+            ang = random.uniform(0, math.tau)
+            rad = shell_r[shell] + random.gauss(0.0, 0.06)
+            rad = max(0.08, min(0.92, rad))
+            x = math.cos(ang) * rad
+            y = math.sin(ang) * rad * 0.92
+            size = random.uniform(1.2, 3.2) if shell < 2 else random.uniform(0.7, 1.8)
+            bright = random.uniform(0.25, 0.9)
+            phase = random.uniform(0, math.tau)
+            vx = random.uniform(-0.0012, 0.0012)
+            vy = random.uniform(-0.0012, 0.0012)
+            self._nodes.append([x, y, size, bright, phase, shell, vx, vy])
+
+        # One dense hub near center so the web reads as a living cluster.
+        for _ in range(12):
+            ang = random.uniform(0, math.tau)
+            rad = random.uniform(0.02, 0.14)
+            self._nodes.append([
+                math.cos(ang) * rad, math.sin(ang) * rad,
+                random.uniform(1.8, 3.6), random.uniform(0.5, 1.0),
+                random.uniform(0, math.tau), -1,
+                random.uniform(-0.0008, 0.0008),
+                random.uniform(-0.0008, 0.0008),
             ])
 
-        # Waveform samples for speaking state
-        self._wave = [0.0] * 96
+        # Edges between nearby nodes (index pairs).
+        self._edges: list[tuple[int, int]] = []
+        n = len(self._nodes)
+        for i in range(n):
+            xi, yi = self._nodes[i][0], self._nodes[i][1]
+            for j in range(i + 1, n):
+                dx = xi - self._nodes[j][0]
+                dy = yi - self._nodes[j][1]
+                d = math.hypot(dx, dy)
+                thr = 0.28 if (self._nodes[i][5] == self._nodes[j][5]) else 0.20
+                if d < thr:
+                    self._edges.append((i, j))
 
-        ThemeManager.add_listener(lambda _: self.update())
+        # Sparse long-haul edges to the hub so packets can travel far.
+        hub = [k for k, nd in enumerate(self._nodes) if nd[5] < 0]
+        if hub:
+            for k, nd in enumerate(self._nodes):
+                if nd[5] < 0:
+                    continue
+                if k % 5 == 0:
+                    self._edges.append((k, hub[k % len(hub)]))
+
+        # Packets: [edge_idx, t 0..1, speed, bright]
+        self._packets: list[list[float]] = []
+        self._next_packet = random.randint(8, 24)
+
+        self._face_path = face_path
+        self._face_px = None
+        self._load_face(face_path)
+
         self._tmr = QTimer(self)
         self._tmr.timeout.connect(self._step)
         self.set_graphics_quality(get_graphics_quality())
 
     def set_graphics_quality(self, quality: str):
-        """Apply a graphics profile without rebuilding the core."""
+        """Apply a graphics profile without rebuilding the HUD."""
         value = _normalize_graphics_quality(quality)
         profile = GRAPHICS_PROFILES[value]
         self._graphics_quality = value
@@ -2197,196 +2343,286 @@ class HudCanvas(QWidget):
         self.update()
 
     def _load_face(self, path: str):
+        """Keep face_path contract; synapse web does not require a face bitmap."""
         try:
+            if not path or not os.path.isfile(path):
+                self._face_px = None
+                return
             from PIL import Image, ImageDraw
+            import io
             img = Image.open(path).convert("RGBA")
             sz  = min(img.size)
             img = img.resize((sz, sz), Image.LANCZOS)
             mk  = Image.new("L", (sz, sz), 0)
             ImageDraw.Draw(mk).ellipse((2, 2, sz - 2, sz - 2), fill=255)
             img.putalpha(mk)
-            import io
             buf = io.BytesIO()
             img.save(buf, format="PNG")
-            px = QPixmap()
-            px.loadFromData(buf.getvalue())
+            px = QPixmap(); px.loadFromData(buf.getvalue())
             self._face_px = px
         except Exception:
             self._face_px = None
 
+    def _is_active(self) -> bool:
+        return self.speaking or self.state in ("THINKING", "PROCESSING")
+
     def _step(self):
         self._tick += 1
-        active = self.state in ("SPEAKING", "THINKING", "PROCESSING")
-        self._tgt_scale  = 1.06 if active else 1.0
-        self._tgt_bright = 0.85 if active else 0.55
-        self._scale     += (self._tgt_scale  - self._scale)  * 0.06
-        self._brightness += (self._tgt_bright - self._brightness) * 0.05
-        self._breath = (self._breath + 0.02) % (2 * math.pi)
-        speed = 1.6 if active else 0.35
-        self._ring_angle = (self._ring_angle + speed) % 360
-        if self.speaking:
-            self._pulse = min(1.0, self._pulse + 0.08)
-            # Living waveform
-            for i in range(len(self._wave)):
-                target = math.sin(self._tick * 0.18 + i * 0.35) * random.uniform(0.25, 1.0)
-                self._wave[i] += (target - self._wave[i]) * 0.25
-        else:
-            self._pulse = max(0.0, self._pulse - 0.04)
-            for i in range(len(self._wave)):
-                self._wave[i] += (0.0 - self._wave[i]) * 0.08
+        now = time.time()
+        is_active = self._is_active()
+
+        # Always animate — state only changes cadence/intensity.
+        if now - self._last_t > (0.12 if is_active else 0.40):
+            if self.speaking:
+                self._tgt_bright = random.uniform(0.85, 1.0)
+            elif self.muted:
+                self._tgt_bright = random.uniform(0.12, 0.28)
+            elif is_active:
+                self._tgt_bright = random.uniform(0.55, 0.85)
+            else:
+                breath = 0.5 + 0.5 * math.sin(self._tick * 0.03)
+                self._tgt_bright = 0.30 + breath * 0.45
+            self._last_t = now
+
+        sp = 0.28 if is_active else 0.10
+        self._brightness += (self._tgt_bright - self._brightness) * sp
+
+        # Perpetual slow rotation of the whole field.
+        rot_speed = 0.006 if is_active else (0.002 if self.muted else 0.0035)
+        self._rotation += rot_speed
+        self._drift_t += 0.01
+
+        # Node drift + breath (never frozen).
+        drift_scale = 2.2 if is_active else 1.0
+        if self.muted:
+            drift_scale *= 0.4
+        for nd in self._nodes[::max(1, self._render_stride)]:
+            nd[4] += 0.05
+            nd[0] += nd[6] * drift_scale + 0.00015 * math.sin(self._drift_t + nd[4])
+            nd[1] += nd[7] * drift_scale + 0.00015 * math.cos(self._drift_t * 0.9 + nd[4])
+            # Soft radial containment
+            r = math.hypot(nd[0], nd[1])
+            if r > 0.95:
+                nd[0] *= 0.98
+                nd[1] *= 0.98
+            if r < 0.04:
+                nd[0] += 0.002
+                nd[1] += 0.001
+            tb = random.uniform(0.55, 1.0) if is_active else (
+                random.uniform(0.08, 0.22) if self.muted else random.uniform(0.28, 0.70))
+            nd[3] += (tb - nd[3]) * 0.07
+
+        # Packet spawn along edges — the synapse signal.
+        self._next_packet -= 1
+        interval = 8 if is_active else 28
+        if self.muted:
+            interval = 50
+        if self._next_packet <= 0 and self._edges and len(self._packets) < self._MAX_PACKETS:
+            ei = random.randrange(len(self._edges))
+            spd = random.uniform(0.012, 0.030) * (2.0 if is_active else 1.0)
+            br = random.uniform(0.7, 1.0)
+            self._packets.append([ei, 0.0, spd, br])
+            self._next_packet = random.randint(max(4, interval // 2), interval)
+
+        alive = []
+        for pk in self._packets:
+            pk[1] += pk[2]
+            if pk[1] < 1.0:
+                alive.append(pk)
+        self._packets = alive
+
+        self._blink_tick += 1
+        if self._blink_tick >= 28:
+            self._blink = not self._blink
+            self._blink_tick = 0
         self.update()
+
+    def _node_xy(self, nd, cx, cy, sr):
+        """Project a node with slow whole-field rotation."""
+        x, y = nd[0], nd[1]
+        ca, sa = math.cos(self._rotation), math.sin(self._rotation)
+        xr = x * ca - y * sa
+        yr = x * sa + y * ca
+        return cx + xr * sr, cy + yr * sr
 
     def paintEvent(self, _):
         p = QPainter(self)
-        if getattr(self, "_antialias", True):
-            p.setRenderHint(QPainter.RenderHint.Antialiasing)
-
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, self._antialias)
         W, H = self.width(), self.height()
-        cx, cy = W / 2, H / 2
-        base = min(W, H) * 0.30
-        r = base * self._scale
-        br = self._brightness
-        t = self._tick
+        cx, cy = W / 2.0, H / 2.0
+        sr = min(W, H) * 0.42
+        is_active = self._is_active()
 
-        # ── Backdrop: soft radial wash ──────────────────────────────────
-        wash = QRadialGradient(QPointF(cx, cy), max(W, H) * 0.55)
-        wash.setColorAt(0.0, qcol(C.PRI, int(10 * br)))
-        wash.setColorAt(0.45, qcol(C.PRI, int(4 * br)))
-        wash.setColorAt(1.0, qcol(C.BG, 0))
-        p.fillRect(self.rect(), wash)
+        # Background — subtle monochrome radial (no old orb art).
+        bg = QRadialGradient(QPointF(cx, cy), max(W, H) * 0.75)
+        bg.setColorAt(0.0, qcol(C.DARK))
+        bg.setColorAt(0.55, qcol(C.BG))
+        bg.setColorAt(1.0, qcol(C.PANEL))
+        p.fillRect(self.rect(), bg)
 
-        # ── Ambient motes ───────────────────────────────────────────────
-        stride = max(1, getattr(self, "_render_stride", 1))
-        for i, (mx, my, msz, phase, spd) in enumerate(self._motes[::stride]):
-            drift_x = math.sin(t * 0.008 * spd + phase) * 14
-            drift_y = math.cos(t * 0.006 * spd + phase) * 10
-            px = mx * W + drift_x
-            py = my * H + drift_y
-            a = int(br * 70 * (0.4 + 0.6 * abs(math.sin(t * 0.02 + phase))))
-            if a > 1:
-                p.setPen(Qt.PenStyle.NoPen)
-                p.setBrush(QBrush(qcol(C.PRI, a)))
-                p.drawEllipse(QPointF(px, py), msz, msz)
-
-        # ── Outer dashed ring (slow orbit) ──────────────────────────────
-        ring_r = r * 1.55
-        p.setPen(QPen(qcol(C.PRI, int(50 * br)), 1.2, Qt.PenStyle.DashLine))
+        # Faint concentric shell guides.
+        base_a = max(8, int(self._brightness * 36))
         p.setBrush(Qt.BrushStyle.NoBrush)
-        ring_rect = QRectF(cx - ring_r, cy - ring_r, ring_r * 2, ring_r * 2)
-        p.drawEllipse(ring_rect)
+        for frac in (0.18, 0.38, 0.58, 0.78):
+            p.setPen(QPen(qcol(C.PRI, max(4, base_a // 3)), 0.6))
+            p.drawEllipse(QPointF(cx, cy), sr * frac, sr * frac)
 
-        # Orbiting accent arc
-        arc_span = 50 * 16
-        start = int(self._ring_angle * 16)
-        p.setPen(QPen(qcol(C.ENERGY, int(140 * br)), 2.2))
-        p.drawArc(ring_rect, start, arc_span)
-        p.drawArc(ring_rect, start + 180 * 16, arc_span)
+        # Edges — breathing synapse lines.
+        pts = [self._node_xy(nd, cx, cy, sr) for nd in self._nodes]
+        for k, (i, j) in enumerate(self._edges[::max(1, self._render_stride)]):
+            if i >= len(pts) or j >= len(pts):
+                continue
+            x1, y1 = pts[i]
+            x2, y2 = pts[j]
+            # Distance-based alpha; active state lifts the web.
+            mid_b = (self._nodes[i][3] + self._nodes[j][3]) * 0.5
+            a = int(self._brightness * 70 * (0.4 + 0.6 * mid_b))
+            if is_active:
+                a = int(a * 1.35)
+            a = max(0, min(200, a))
+            if a < 3:
+                continue
+            p.setPen(QPen(qcol(C.PRI, a), 0.7 if not is_active else 0.9))
+            p.drawLine(QPointF(x1, y1), QPointF(x2, y2))
 
-        # Second thin ring
-        ring2 = r * 1.28
-        p.setPen(QPen(qcol(C.PRI, int(35 * br)), 0.8))
-        p.drawEllipse(QPointF(cx, cy), ring2, ring2)
+        # Packets — bright travelling synapse sparks.
+        for pk in self._packets:
+            ei = int(pk[0])
+            if ei >= len(self._edges):
+                continue
+            i, j = self._edges[ei]
+            if i >= len(pts) or j >= len(pts):
+                continue
+            t = pk[1]
+            # Ease with a soft glow trail
+            x = pts[i][0] + (pts[j][0] - pts[i][0]) * t
+            y = pts[i][1] + (pts[j][1] - pts[i][1]) * t
+            fade = math.sin(t * math.pi)
+            pa = int(220 * pk[3] * fade)
+            if pa < 10:
+                continue
+            # Head
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(qcol(C.ENERGY, pa)))
+            p.drawEllipse(QPointF(x, y), 2.4, 2.4)
+            # Short trail
+            tx = pts[i][0] + (pts[j][0] - pts[i][0]) * max(0.0, t - 0.12)
+            ty = pts[i][1] + (pts[j][1] - pts[i][1]) * max(0.0, t - 0.12)
+            p.setPen(QPen(qcol(C.ENERGY, max(0, pa // 2)), 1.4))
+            p.drawLine(QPointF(tx, ty), QPointF(x, y))
 
-        # ── Core orb ────────────────────────────────────────────────────
-        breath = 1.0 + 0.03 * math.sin(self._breath)
-        core_r = r * breath
-        grad = QRadialGradient(QPointF(cx - core_r * 0.2, cy - core_r * 0.25), core_r * 1.15)
-        grad.setColorAt(0.0, qcol(C.ENERGY, int(40 + 50 * br)))
-        grad.setColorAt(0.55, qcol(C.PRI, int(18 + 22 * br)))
-        grad.setColorAt(1.0, qcol(C.DARK2, 200))
+        # Nodes — monochrome synapse boutons.
+        for k, nd in enumerate(self._nodes):
+            if k % max(1, self._render_stride) != 0 and nd[5] >= 0:
+                # Skip some outer nodes under load; keep hub visible.
+                continue
+            x, y = pts[k]
+            breath = 0.65 + 0.35 * math.sin(nd[4])
+            a = int(255 * nd[3] * breath * (0.35 + 0.65 * self._brightness))
+            if self.muted:
+                a = int(a * 0.35)
+            a = max(0, min(255, a))
+            if a < 6:
+                continue
+            r = nd[2] * (1.15 if is_active else 1.0) * (0.9 + 0.2 * breath)
+            p.setPen(Qt.PenStyle.NoPen)
+            # Soft halo
+            p.setBrush(QBrush(qcol(C.PRI, max(0, a // 5))))
+            p.drawEllipse(QPointF(x, y), r * 2.2, r * 2.2)
+            # Core
+            p.setBrush(QBrush(qcol(C.ENERGY, a)))
+            p.drawEllipse(QPointF(x, y), r, r)
+
+        # Central synaptic cluster glow (not an orb face).
+        core_a = max(10, int(self._brightness * 55))
+        glow = QRadialGradient(QPointF(cx, cy), sr * 0.28)
+        glow.setColorAt(0.0, qcol(C.ENERGY, core_a))
+        glow.setColorAt(0.4, qcol(C.PRI, core_a // 3))
+        glow.setColorAt(1.0, qcol(C.BG, 0))
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QBrush(grad))
-        p.drawEllipse(QPointF(cx, cy), core_r, core_r)
+        p.setBrush(QBrush(glow))
+        p.drawEllipse(QPointF(cx, cy), sr * 0.28, sr * 0.28)
+        # Hard center pip
+        p.setBrush(QBrush(qcol(C.ENERGY, min(255, core_a + 80))))
+        p.drawEllipse(QPointF(cx, cy), 3.0, 3.0)
 
-        # Core rim
-        p.setPen(QPen(qcol(C.PRI, int(110 * br)), 1.4))
-        p.setBrush(Qt.BrushStyle.NoBrush)
-        p.drawEllipse(QPointF(cx, cy), core_r, core_r)
+        # Corner brackets — quiet technical frame.
+        bl = int(min(W, H) * 0.07)
+        bc = qcol(C.PRI, max(30, int(self._brightness * 140)))
+        m = min(W, H) * 0.46
+        for bx, by, dx, dy in (
+            (cx - m, cy - m, 1, 1),
+            (cx + m, cy - m, -1, 1),
+            (cx - m, cy + m, 1, -1),
+            (cx + m, cy + m, -1, -1),
+        ):
+            p.setPen(QPen(bc, 1.4))
+            p.drawLine(QPointF(bx, by), QPointF(bx + dx * bl, by))
+            p.drawLine(QPointF(bx, by), QPointF(bx, by + dy * bl))
+            pa = int(80 + 50 * math.sin(self._tick * 0.07 + bx * 0.01))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(qcol(C.ENERGY, max(40, min(180, pa)))))
+            p.drawEllipse(QPointF(bx + dx * 4, by + dy * 4), 2.2, 2.2)
 
-        # Pulse ring when speaking
-        if self._pulse > 0.02:
-            for k in range(3):
-                pr = core_r * (1.08 + k * 0.14 + self._pulse * 0.12)
-                a = int(90 * self._pulse * (1.0 - k * 0.28))
-                if a > 1:
-                    p.setPen(QPen(qcol(C.ENERGY, a), 1.5))
-                    p.drawEllipse(QPointF(cx, cy), pr, pr)
-
-        # ── Face or monogram ────────────────────────────────────────────
-        if self._face_px is not None and not self._face_px.isNull():
-            fsz = int(core_r * 1.35)
-            target = self._face_px.scaled(
-                fsz, fsz,
-                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-            p.setOpacity(0.92)
-            p.drawPixmap(int(cx - fsz / 2), int(cy - fsz / 2), target)
-            p.setOpacity(1.0)
+        # Status line — monochrome.
+        sy_t = cy + min(W, H) * 0.48
+        if self.muted:
+            txt, col = "⊘  MUTED", qcol(C.MUTED_C)
+        elif self.speaking:
+            txt, col = "●  SPEAKING", qcol(C.ENERGY)
+        elif self.state == "THINKING":
+            sym = "◆" if self._blink else "◇"
+            txt, col = f"{sym}  PROCESSING QUERY", qcol(C.ACC2)
+        elif self.state == "PROCESSING":
+            sym = "▹" if self._blink else "▸"
+            txt, col = f"{sym}  EXECUTING", qcol(C.ACC)
+        elif self.state == "LISTENING":
+            sym = "●" if self._blink else "○"
+            txt, col = f"{sym}  LISTENING", qcol(C.ENERGY)
         else:
-            # MITSU monogram — clean, not sci-fi
-            p.setFont(QFont("Arial", max(14, int(core_r * 0.72)), QFont.Weight.Bold))
-            p.setPen(QPen(qcol(C.WHITE, int(200 * min(1.0, br + 0.3)))))
-            p.drawText(QRectF(cx - core_r, cy - core_r, core_r * 2, core_r * 2),
-                       int(Qt.AlignmentFlag.AlignCenter), "M")
+            sym = "●" if self._blink else "○"
+            txt, col = f"{sym}  {self.state}", qcol(C.PRI)
 
-        # ── State label under orb ───────────────────────────────────────
-        label = {
-            "INITIALISING": "INITIALISING",
-            "LISTENING": "LISTENING",
-            "THINKING": "THINKING",
-            "PROCESSING": "PROCESSING",
-            "SPEAKING": "SPEAKING",
-            "MUTED": "MUTED",
-        }.get(self.state, self.state)
-        if self.muted and self.state != "MUTED":
-            label = "MUTED"
         p.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
-        state_color = {
-            "LISTENING": C.GREEN,
-            "SPEAKING": C.ENERGY,
-            "THINKING": C.ACC2,
-            "PROCESSING": C.ACC2,
-            "MUTED": C.RED,
-        }.get(label, C.TEXT_MED)
-        p.setPen(QPen(qcol(state_color, 220)))
-        p.drawText(QRectF(0, cy + ring_r + 14, W, 24),
-                   int(Qt.AlignmentFlag.AlignCenter), label)
+        shadow = QColor(col); shadow.setAlpha(24)
+        for _ox, _oy in ((-2, 0), (2, 0), (0, -2), (0, 2)):
+            p.setPen(QPen(shadow, 1))
+            p.drawText(QRectF(_ox, sy_t + _oy, W, 18), Qt.AlignmentFlag.AlignCenter, txt)
+        p.setPen(QPen(col, 1))
+        p.drawText(QRectF(0, sy_t, W, 18), Qt.AlignmentFlag.AlignCenter, txt)
 
-        # ── Speaking waveform ───────────────────────────────────────────
-        if self._pulse > 0.03 or any(abs(w) > 0.02 for w in self._wave):
-            wave_w = min(W * 0.55, 340)
-            wave_h = 28.0
-            wy = cy + ring_r + 42
-            wx0 = cx - wave_w / 2
-            p.setPen(QPen(qcol(C.ENERGY, int(160 * max(self._pulse, 0.25))), 1.6))
-            path = QPainterPath()
-            step = max(1, getattr(self, "_wave_stride", 1) * 2)
-            pts = self._wave[::step]
-            for i, v in enumerate(pts):
-                x = wx0 + (i / max(1, len(pts) - 1)) * wave_w
-                y = wy + v * wave_h * 0.5
-                if i == 0:
-                    path.moveTo(x, y)
-                else:
-                    path.lineTo(x, y)
-            p.drawPath(path)
+        # Speaking ticks under status — quiet energy meter.
+        if self.speaking:
+            sw_N = 24
+            bw = 5
+            sw_w = sw_N * bw
+            wx0 = (W - sw_w) / 2.0
+            wy = sy_t + 24
+            for si in range(sw_N):
+                sh = random.randint(2, 16)
+                p.fillRect(
+                    QRectF(wx0 + si * bw, wy - sh / 2.0, bw - 1.5, sh),
+                    qcol(C.ENERGY, 150),
+                )
 
-        # ── Soft vignette ───────────────────────────────────────────────
-        vig = QRadialGradient(QPointF(cx, cy), max(W, H) * 0.72)
-        vig.setColorAt(0.0, qcol(C.BG, 0))
-        vig.setColorAt(0.7, qcol(C.BG, 0))
-        vig.setColorAt(1.0, qcol(C.BG, 150))
-        p.fillRect(self.rect(), vig)
+        # Scanlines + grain (profile-driven).
+        if self._scanline_step > 0:
+            for _sy in range(0, H, self._scanline_step):
+                p.fillRect(QRectF(0, _sy, W, 1), qcol(C.PRI, 8))
+            sweep_y = (self._tick * 1.2) % H
+            for _sy in range(0, H, max(3, self._scanline_step - 1)):
+                dist = abs(_sy - sweep_y) / max(1, H)
+                sa = max(0, int(10 * (1.0 - dist * 8)))
+                if sa > 0:
+                    p.fillRect(QRectF(0, _sy, W, 1), qcol(C.ENERGY, sa))
 
-        # Film grain (respects graphics quality)
-        noise_n = getattr(self, "_noise_count", 0)
-        if noise_n and self._tick % 3 == 0:
-            for _ in range(noise_n // 4):
-                nx = random.randint(0, W - 1)
-                ny = random.randint(0, H - 1)
-                p.fillRect(QRectF(nx, ny, 1, 1), qcol(C.PRI, 18))
+        if self._noise_count:
+            for _ in range(self._noise_count):
+                _nx = random.randint(0, max(1, W - 1))
+                _ny = random.randint(0, max(1, H - 1))
+                p.fillRect(QRectF(_nx, _ny, 1, 1), qcol(C.PRI, 40))
 
+        p.end()
 
 class MetricBar(QWidget):
 
@@ -2536,16 +2772,16 @@ class AgentGridWidget(QWidget):
     Implements all 12 feedback points: hierarchy, color, spacing, activity stream.
     """
 
-    # ── Per-agent accent colors (points 4 & 9) ──────────────────────────────
+    # ── Per-agent accent (monochrome luminance ladder) ─────────────────────
     _ACCENT = {
-        "CORE":       "#00E5FF",   # brightest cyan  (special)
-        "RESEARCH":   "#00E5FF",   # cyan
-        "SECURITY":   "#1E90FF",   # blue
-        "AUTOMATION": "#FFD700",   # gold
-        "MEMORY":     "#BF7FFF",   # purple
-        "VISION":     "#00FF7F",   # green
-        "DEV":        "#E0E0E0",   # white
-        "SYSTEM":     "#00CED1",   # teal
+        "CORE":       "#FFFFFF",
+        "RESEARCH":   "#E0E0E0",
+        "SECURITY":   "#CCCCCC",
+        "AUTOMATION": "#AAAAAA",
+        "MEMORY":     "#BBBBBB",
+        "VISION":     "#999999",
+        "DEV":        "#E0E0E0",
+        "SYSTEM":     "#777777",
     }
 
     _STATUS = {
@@ -3677,12 +3913,12 @@ class LogWidget(QTextEdit):
             QTimer.singleShot(20, self._next)
 
 _FILE_ICONS = {
-    "image":   ("🖼", "#00d4ff"), "video":   ("🎬", "#ff6b00"),
-    "audio":   ("🎵", "#cc44ff"), "pdf":     ("📄", "#ff4444"),
-    "word":    ("📝", "#4488ff"), "excel":   ("📊", "#44bb44"),
-    "code":    ("💻", "#ffcc00"), "archive": ("📦", "#ff8844"),
-    "pptx":    ("📊", "#ff6622"), "text":    ("📃", "#aaaaaa"),
-    "data":    ("🔧", "#88ddff"), "unknown": ("📎", "#888888"),
+    "image":   ("🖼", "#F0F0F0"), "video":   ("🎬", "#CCCCCC"),
+    "audio":   ("🎵", "#E0E0E0"), "pdf":     ("📄", "#AAAAAA"),
+    "word":    ("📝", "#DDDDDD"), "excel":   ("📊", "#BBBBBB"),
+    "code":    ("💻", "#FFFFFF"), "archive": ("📦", "#999999"),
+    "pptx":    ("📊", "#AAAAAA"), "text":    ("📃", "#AAAAAA"),
+    "data":    ("🔧", "#CCCCCC"), "unknown": ("📎", "#888888"),
 }
 _EXT_TO_CAT = {
     **dict.fromkeys(["jpg","jpeg","png","gif","webp","bmp","tiff","svg","ico"], "image"),
@@ -3903,7 +4139,7 @@ class SetupOverlay(QWidget):
         p.end()
         super().paintEvent(event)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, initial_provider: str | None = None):
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(f"""
@@ -3921,7 +4157,10 @@ class SetupOverlay(QWidget):
         self._validation_pending = False
         self._purge_saved_on_failure = False
         self._verified_key = ""
-        self._selected_provider = "gemini"
+        preferred = (initial_provider or _load_provider_preference()).strip().lower()
+        if preferred not in ("gemini", "ollama", "openrouter"):
+            preferred = "ollama"
+        self._selected_provider = preferred
         self.validation_finished.connect(self._on_validation_finished)
 
         layout = QVBoxLayout(self)
@@ -4020,7 +4259,7 @@ class SetupOverlay(QWidget):
         key_layout.addWidget(self._remember_key)
 
         layout.addWidget(self._key_section)
-        self._sel_provider("gemini")
+        self._sel_provider(preferred)
 
         layout.addSpacing(6)
 
@@ -4066,7 +4305,7 @@ class SetupOverlay(QWidget):
 
     def _sel(self, key: str):
         self._sel_os = key
-        pal = {"windows":(C.PRI,C.DARK2),"mac":(C.ACC2,C.DARK),"linux":(C.GREEN,C.DARK)}
+        pal = {"windows":(C.PRI,C.DARK2),"mac":(C.ACC2,C.DARK),"linux":(C.ACC2,C.DARK)}
         for k, btn in self._os_btns.items():
             if k == key:
                 fg, bg = pal[k]
@@ -4087,7 +4326,7 @@ class SetupOverlay(QWidget):
 
     def _sel_provider(self, key: str):
         self._selected_provider = key
-        pal = {"gemini": C.ENERGY, "ollama": C.GREEN, "openrouter": C.PRI}
+        pal = {"gemini": C.ENERGY, "ollama": C.ACC2, "openrouter": C.PRI}
         for k, btn in self._prov_btns.items():
             if k == key:
                 fg = pal.get(k, C.PRI)
@@ -5570,7 +5809,7 @@ class _SubtitleWidget(QWidget):
         rect = self.rect().adjusted(12, 4, -12, -4)
 
         # Semi-transparent background panel for readability
-        _bg_col = QColor(0, 5, 12, int(160 * self._opacity))
+        _bg_col = QColor(0, 0, 0, int(160 * self._opacity))
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QBrush(_bg_col))
         _r = self.rect().adjusted(4, 2, -4, -2)
@@ -5578,7 +5817,7 @@ class _SubtitleWidget(QWidget):
         p.drawRoundedRect(_r, _rr, _rr)
 
         # Semi-transparent background panel for readability
-        _bg_col = QColor(0, 5, 12, int(160 * self._opacity))
+        _bg_col = QColor(0, 0, 0, int(160 * self._opacity))
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QBrush(_bg_col))
         _r = self.rect().adjusted(4, 2, -4, -2)
@@ -6138,6 +6377,7 @@ class MainWindow(QMainWindow):
         self._sub_hold_sig.connect(self._subtitle.start_hold_timer)
         self._mode_sig.connect(self._ai_canvas.set_mode)
         self._task_sig.connect(self._mission.task_widget.push_task)
+        self._task_sig.connect(lambda *_: self._refresh_task_snippets())
         self._tool_sig.connect(self._mission.tool_widget.push)
         self._theme_sig.connect(ThemeManager.set_theme)
         self._graphics_sig.connect(self._apply_graphics_quality_live)
@@ -6175,43 +6415,58 @@ class MainWindow(QMainWindow):
 
         # ── Theme manager listener ───────────────────────────────────────────
         ThemeManager.add_listener(self._on_theme_changed)
-        # Load saved theme on boot
+        # Boot in the black/white/grey noir theme; ignore any non-noir saved theme.
         try:
-            from pathlib import Path
-            import json
-            cfg_file = Path.home() / ".mitsu" / "config" / "settings.json"
-            if cfg_file.exists():
-                cfg = json.loads(cfg_file.read_text(encoding="utf-8"))
-                saved_theme = cfg.get("theme", "")
-                if saved_theme and saved_theme in ThemeManager.theme_names():
-                    ThemeManager.set_theme(saved_theme)
+            if ThemeManager.current_name() != "mitsu_noir":
+                ThemeManager.set_theme("mitsu_noir")
         except Exception:
             pass
 
-        # Every key source uses the same Gemini verification gate. Environment
-        # variables and remembered keys are never trusted merely because they
-        # were present on an earlier run.
+        # Local mode needs no API key. Cloud key UI only appears when Cloud
+        # (or OpenRouter) is selected — never forced on every boot.
         self._ready = False
-        candidate_key = os.environ.get("GEMINI_API_KEY", "").strip()
-        candidate_is_saved = False
-        try:
-            if not candidate_key:
-                store = get_secret_store()
-                saved = store.get("gemini_api_key")
-                if saved:
-                    candidate_key = saved.strip()
-                    candidate_is_saved = True
-        except Exception:
+        self._overlay = None
+        provider_pref = _load_provider_preference()
+        already_configured = self._check_config()
+        detected = {"darwin": "mac", "windows": "windows"}.get(
+            _OS.lower(), "linux"
+        )
+
+        if already_configured:
+            # Prior setup finished — boot straight in with no API gate.
+            os.environ["MITSU_PROVIDER"] = provider_pref
+            self._ready = True
+            self._apply_state("LISTENING")
+            self._log.append_log("SYS: INITIATING SYSTEMS...")
+            self._log.append_log("SYS: CORE SYSTEMS ONLINE")
+            self._log.append_log("SYS: LANGUAGE CORE ACTIVE  [OK]")
+            self._log.append_log("SYS: INTERFACE READY       [OK]")
+            self._log.append_log("SYS: VOICE SYNTHESIS READY  [OK]")
+            self._log.append_log(f"SYS: PLATFORM {detected.upper()} DETECTED")
+            self._log.append_log("SYS: ALL SYSTEMS NOMINAL")
+            if provider_pref != "ollama":
+                self._log.append_log(f"SYS: Provider ready: {provider_pref}")
+            QTimer.singleShot(0, self._show_voice_select_then_name)
+        else:
             candidate_key = ""
             candidate_is_saved = False
-
-        self._show_setup()
-        if candidate_key and self._overlay:
-            self._overlay.validate_candidate(
-                candidate_key,
-                remember_key=candidate_is_saved,
-                purge_saved_on_failure=candidate_is_saved,
-            )
+            if provider_pref == "gemini":
+                candidate_key = os.environ.get("GEMINI_API_KEY", "").strip()
+                if not candidate_key:
+                    try:
+                        saved = get_secret_store().get("gemini_api_key")
+                        if saved:
+                            candidate_key = saved.strip()
+                            candidate_is_saved = True
+                    except Exception:
+                        candidate_key = ""
+            self._show_setup(initial_provider=provider_pref)
+            if provider_pref == "gemini" and candidate_key and self._overlay:
+                self._overlay.validate_candidate(
+                    candidate_key,
+                    remember_key=candidate_is_saved,
+                    purge_saved_on_failure=candidate_is_saved,
+                )
 
 
         sc_mute = QShortcut(QKeySequence("F4"), self)
@@ -6545,6 +6800,13 @@ class MainWindow(QMainWindow):
         ):
             if spark is not None:
                 spark._color = color
+
+        if hasattr(self, "_sync_status_card"):
+            self._sync_status_card()
+        if hasattr(self, "_refresh_memory_snippets"):
+            self._refresh_memory_snippets()
+        if hasattr(self, "_refresh_task_snippets"):
+            self._refresh_task_snippets()
 
         for widget in self.findChildren(QWidget):
             widget.update()
@@ -6918,7 +7180,7 @@ class MainWindow(QMainWindow):
         label_styles = (
             ("_header_brand_lbl", C.WHITE),
             ("_header_mark_lbl", C.TEXT_MED),
-            ("_header_state_lbl", C.GREEN),
+            ("_header_state_lbl", C.ENERGY),
             ("_header_mode_lbl", C.TEXT_MED),
             ("_clock_lbl", C.WHITE),
             ("_date_lbl", C.TEXT_DIM),
@@ -6939,6 +7201,11 @@ class MainWindow(QMainWindow):
             ("_uptime_lbl", C.TEXT_DIM),
             ("_session_lbl", C.TEXT_DIM),
             ("_proc_lbl", C.TEXT_MED),
+            ("_status_state_lbl", C.ENERGY),
+            ("_status_provider_lbl", C.TEXT_MED),
+            ("_rail_status_dot_lbl", C.ACC2),
+            ("_mem_empty_lbl", C.TEXT_DIM),
+            ("_task_empty_lbl", C.TEXT_DIM),
         ):
             label = getattr(self, attr, None)
             if label is not None:
@@ -7098,7 +7365,7 @@ class MainWindow(QMainWindow):
         title = QLabel("●  ONLINE")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setFont(QFont("Arial", 9, QFont.Weight.DemiBold))
-        title.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
+        title.setStyleSheet(f"color: {C.ENERGY}; background: transparent;")
         self._header_state_lbl = title
         mid.addWidget(title)
 
@@ -7201,151 +7468,143 @@ class MainWindow(QMainWindow):
         self._left_system_btn.setChecked(True)
         lay.addLayout(nav)
 
-        # ── System Status (redesigned) ──────────────────────────────────────
+        # ── System page: Status · Memory · Tasks ───────────────────────────
         metrics_w = QWidget()
         metrics_w.setObjectName("systemOverview")
         metrics_w.setStyleSheet("background: transparent;")
         ml = QVBoxLayout(metrics_w)
-        ml.setContentsMargins(12, 10, 12, 8)
-        ml.setSpacing(3)
+        ml.setContentsMargins(8, 8, 8, 8)
+        ml.setSpacing(8)
 
-        # Header
-        sys_hdr = QLabel("Live system")
-        self._system_title_lbl = sys_hdr
-        sys_hdr.setFont(QFont("Arial", 9, QFont.Weight.DemiBold))
-        sys_hdr.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
-        ml.addWidget(sys_hdr)
+        def _card(title: str) -> QVBoxLayout:
+            box = QWidget()
+            box.setStyleSheet(
+                f"background: {C.CARD}; border: 1px solid {C.BORDER};"
+                f" border-radius: 6px;"
+            )
+            ly = QVBoxLayout(box)
+            ly.setContentsMargins(10, 8, 10, 8)
+            ly.setSpacing(4)
+            hdr = QLabel(title)
+            hdr.setFont(QFont("Courier New", 7, QFont.Weight.Bold))
+            hdr.setStyleSheet(
+                f"color: {C.TEXT_DIM}; background: transparent; letter-spacing: 2px;"
+            )
+            ly.addWidget(hdr)
+            ml.addWidget(box)
+            return ly
 
-        # Sparkline metrics — CPU, MEM, NET with live graphs
-        self._spark_cpu = SparklineBar("CPU", C.PRI)
-        self._spark_mem = SparklineBar("MEM", C.ENERGY)
-        self._spark_net = SparklineBar("NET", C.ACC2)
-        for spark in [self._spark_cpu, self._spark_mem, self._spark_net]:
-            ml.addWidget(spark)
-            spark.hide()
+        # ── STATUS ─────────────────────────────────────────────────────────
+        st = _card("STATUS")
+        self._system_title_lbl = QLabel("STATUS")
+        self._system_title_lbl.hide()
 
-        ml.addSpacing(6)
+        state_row = QHBoxLayout(); state_row.setSpacing(6)
+        self._rail_status_dot_lbl = QLabel("●")
+        self._rail_status_dot_lbl.setFont(QFont("Courier New", 9))
+        self._rail_status_dot_lbl.setStyleSheet(
+            f"color: {C.ENERGY}; background: transparent;"
+        )
+        state_row.addWidget(self._rail_status_dot_lbl)
+        self._status_state_lbl = QLabel("LISTENING")
+        self._status_state_lbl.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
+        self._status_state_lbl.setStyleSheet(
+            f"color: {C.ENERGY}; background: transparent; letter-spacing: 1px;"
+        )
+        state_row.addWidget(self._status_state_lbl, stretch=1)
+        st.addLayout(state_row)
 
-        # ── GPU Block (expanded) ────────────────────────────────────────────
-        gpu_super = QLabel("HARDWARE")
-        self._hardware_title_lbl = gpu_super
-        gpu_super.setFont(QFont("Courier New", 6))
-        gpu_super.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent; letter-spacing: 2px;")
-        ml.addWidget(gpu_super)
+        prov_row = QHBoxLayout(); prov_row.setSpacing(4)
+        prov_k = QLabel("PROVIDER")
+        prov_k.setFont(QFont("Courier New", 6))
+        prov_k.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
+        prov_row.addWidget(prov_k)
+        prov_row.addStretch()
+        self._status_provider_lbl = QLabel(_load_provider_preference().upper())
+        self._status_provider_lbl.setFont(QFont("Courier New", 7, QFont.Weight.Bold))
+        self._status_provider_lbl.setStyleSheet(
+            f"color: {C.TEXT_MED}; background: transparent;"
+        )
+        prov_row.addWidget(self._status_provider_lbl)
+        st.addLayout(prov_row)
 
-        gpu_hdr_row = QHBoxLayout()
-        gpu_hdr_lbl = QLabel("GPU")
-        gpu_hdr_lbl.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
-        gpu_hdr_lbl.setStyleSheet(f"color: {C.PRI}; background: transparent; letter-spacing: 2px;")
-        gpu_hdr_row.addWidget(gpu_hdr_lbl)
-        gpu_hdr_lbl.hide()
-        gpu_hdr_row.addStretch()
-        self._gpu_pct_lbl = QLabel("0%")
-        self._gpu_pct_lbl.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
-        self._gpu_pct_lbl.setStyleSheet(f"color: {C.ENERGY}; background: transparent;")
-        gpu_hdr_row.addWidget(self._gpu_pct_lbl)
-        self._gpu_pct_lbl.hide()
-        ml.addLayout(gpu_hdr_row)
-
-        # chip name
-        self._gpu_name_lbl = QLabel("Detecting...")
-        self._gpu_name_lbl.setFont(QFont("Courier New", 7))
-        self._gpu_name_lbl.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
-        ml.addWidget(self._gpu_name_lbl)
-
-        ml.addSpacing(3)
-
-        # LOAD label + bar
-        gpu_load_hdr = QLabel("LOAD")
-        gpu_load_hdr.setFont(QFont("Courier New", 6))
-        gpu_load_hdr.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent; letter-spacing: 1px;")
-        ml.addWidget(gpu_load_hdr)
-        gpu_load_hdr.hide()
-
-        self._gpu_load_bar = QProgressBar()
-        self._gpu_load_bar.setRange(0, 100)
-        self._gpu_load_bar.setValue(0)
-        self._gpu_load_bar.setFixedHeight(6)
-        self._gpu_load_bar.setTextVisible(False)
-        self._gpu_load_bar.setStyleSheet(f"""
-            QProgressBar {{
-                background: {C.BORDER};
-                border: none;
-                border-radius: 3px;
-            }}
-            QProgressBar::chunk {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 {C.PRI}, stop:1 {C.ENERGY});
-                border-radius: 3px;
-            }}
-        """)
-        ml.addWidget(self._gpu_load_bar)
-        self._gpu_load_bar.hide()
-
-        ml.addSpacing(3)
-
-        # VRAM row
-        gpu_vram_row = QHBoxLayout()
-        vram_lbl = QLabel("VRAM")
-        vram_lbl.setFont(QFont("Courier New", 6))
-        vram_lbl.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent; letter-spacing: 1px;")
-        gpu_vram_row.addWidget(vram_lbl)
-        gpu_vram_row.addStretch()
-        self._gpu_vram_lbl = QLabel("N/A")
-        self._gpu_vram_lbl.setFont(QFont("Courier New", 7, QFont.Weight.Bold))
-        self._gpu_vram_lbl.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
-        gpu_vram_row.addWidget(self._gpu_vram_lbl)
-        ml.addLayout(gpu_vram_row)
-
-        ml.addSpacing(6)
-
-        # ── TMP sparkline (same style as CPU/MEM/NET) ───────────────────────
-        self._spark_tmp = SparklineBar("TMP", "#FF6B35")
-        ml.addWidget(self._spark_tmp)
-        self._spark_tmp.hide()
-
-        ml.addSpacing(4)
-
-        # Cognitive load with progress bar
-        cog_hdr = QLabel("COGNITIVE LOAD")
-        cog_hdr.setFont(QFont("Courier New", 6, QFont.Weight.Bold))
-        cog_hdr.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent; letter-spacing: 2px;")
-        ml.addWidget(cog_hdr)
-        cog_hdr.hide()
-        # Keep MetricBar references for data compatibility. Cognition is the
-        # only visible bar because the other values already use spark rows.
-        self._bar_cpu = MetricBar("CPU", C.TEXT_MED)
-        self._bar_mem = MetricBar("MEM", C.TEXT_MED)
-        self._bar_net = MetricBar("NET", C.TEXT_MED)
-        self._bar_gpu = MetricBar("GPU", C.TEXT_MED)
-        self._bar_tmp = MetricBar("TMP", C.TEXT_MED)
-        self._bar_cog = MetricBar("COG", C.TEXT_MED)
-        for b in [self._bar_cpu, self._bar_mem, self._bar_net, self._bar_gpu, self._bar_tmp, self._bar_cog]:
-            ml.addWidget(b)
-
-        # Info row
         info_row = QHBoxLayout(); info_row.setSpacing(4)
         self._uptime_lbl = QLabel("UP --:--")
         self._uptime_lbl.setFont(QFont("Courier New", 6))
         self._uptime_lbl.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
         info_row.addWidget(self._uptime_lbl)
         info_row.addStretch()
-        self._session_lbl = QLabel("00:00:00")
+        self._session_lbl = QLabel("SESSION  00:00:00")
         self._session_lbl.setFont(QFont("Courier New", 6))
         self._session_lbl.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
         info_row.addWidget(self._session_lbl)
-        ml.addLayout(info_row)
+        st.addLayout(info_row)
 
         self._proc_lbl = QLabel("PROC  --")
         self._proc_lbl.setFont(QFont("Courier New", 6))
         self._proc_lbl.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
-        ml.addWidget(self._proc_lbl)
+        st.addWidget(self._proc_lbl)
+
+        # ── MEMORY snippets ─────────────────────────────────────────────────
+        mem = _card("MEMORY")
+        self._mem_snip_box = QVBoxLayout()
+        self._mem_snip_box.setSpacing(3)
+        mem.addLayout(self._mem_snip_box)
+        self._mem_empty_lbl = QLabel("No memory entries yet.")
+        self._mem_empty_lbl.setFont(QFont("Courier New", 7))
+        self._mem_empty_lbl.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
+        self._mem_empty_lbl.setWordWrap(True)
+        mem.addWidget(self._mem_empty_lbl)
+        mem.addStretch()
+
+        # ── TASKS ───────────────────────────────────────────────────────────
+        tasks = _card("TASKS")
+        self._task_snip_box = QVBoxLayout()
+        self._task_snip_box.setSpacing(3)
+        tasks.addLayout(self._task_snip_box)
+        self._task_empty_lbl = QLabel("Queue idle.")
+        self._task_empty_lbl.setFont(QFont("Courier New", 7))
+        self._task_empty_lbl.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
+        tasks.addWidget(self._task_empty_lbl)
+        tasks.addStretch()
+
+        ml.addStretch(1)
+
+        # Hidden metric sinks — kept for _update_metrics / theme / tests.
+        self._spark_cpu = SparklineBar("CPU", C.PRI)
+        self._spark_mem = SparklineBar("MEM", C.ENERGY)
+        self._spark_net = SparklineBar("NET", C.ACC2)
+        self._spark_tmp = SparklineBar("TMP", C.ACC)
+        self._bar_cpu = MetricBar("CPU", C.TEXT_MED)
+        self._bar_mem = MetricBar("MEM", C.TEXT_MED)
+        self._bar_net = MetricBar("NET", C.TEXT_MED)
+        self._bar_gpu = MetricBar("GPU", C.TEXT_MED)
+        self._bar_tmp = MetricBar("TMP", C.TEXT_MED)
+        self._bar_cog = MetricBar("COG", C.TEXT_MED)
+        for hidden in (
+            self._spark_cpu, self._spark_mem, self._spark_net, self._spark_tmp,
+            self._bar_cpu, self._bar_mem, self._bar_net,
+            self._bar_gpu, self._bar_tmp, self._bar_cog,
+        ):
+            hidden.setParent(metrics_w)
+            hidden.hide()
+
+        self._gpu_name_lbl = QLabel("")
+        self._gpu_vram_lbl = QLabel("N/A")
+        self._gpu_pct_lbl = QLabel("N/A")
+        self._gpu_load_bar = QProgressBar()
+        self._gpu_load_bar.setRange(0, 100)
+        self._gpu_load_bar.setValue(0)
+        for hidden in (self._gpu_name_lbl, self._gpu_vram_lbl, self._gpu_pct_lbl, self._gpu_load_bar):
+            hidden.setParent(metrics_w)
+            hidden.hide()
+        self._hardware_title_lbl = QLabel("")
+        self._hardware_title_lbl.hide()
 
         self._left_stack = QStackedWidget()
         self._left_stack.setStyleSheet("background: transparent; border: none;")
         self._left_stack.addWidget(metrics_w)
 
-        # ── Agent grid (fills remaining space) ───────────────────────────────
         self._agent_grid = AgentGridWidget()
         self._left_stack.addWidget(self._agent_grid)
         lay.addWidget(self._left_stack, stretch=1)
@@ -7360,7 +7619,104 @@ class MainWindow(QMainWindow):
         self._left_agents_btn.clicked.connect(lambda: _show_left_page(1))
         self._style_left_nav()
 
+        QTimer.singleShot(0, self._refresh_memory_snippets)
+        QTimer.singleShot(0, self._refresh_task_snippets)
+
         return w
+
+    def _refresh_memory_snippets(self):
+        """Show a few recent long-term memory entries in the left rail."""
+        if not hasattr(self, "_mem_snip_box"):
+            return
+        while self._mem_snip_box.count():
+            item = self._mem_snip_box.takeAt(0)
+            wdg = item.widget()
+            if wdg is not None:
+                wdg.deleteLater()
+        try:
+            from memory.memory_manager import load_memory, _all_entries
+            entries = _all_entries(load_memory())
+        except Exception:
+            entries = []
+        entries = sorted(entries, key=lambda t: t[2].get("updated", ""), reverse=True)[:5]
+        if hasattr(self, "_mem_empty_lbl"):
+            self._mem_empty_lbl.setVisible(not entries)
+        for cat, key, entry in entries:
+            raw = str(entry.get("value", "")).replace("\n", " ").strip()
+            if len(raw) > 72:
+                raw = raw[:69] + "…"
+            row = QLabel(f"· {cat}/{key}: {raw}")
+            row.setFont(QFont("Courier New", 7))
+            row.setWordWrap(True)
+            row.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
+            self._mem_snip_box.addWidget(row)
+
+    def _refresh_task_snippets(self):
+        """Mirror a few live task statuses into the left rail."""
+        if not hasattr(self, "_task_snip_box"):
+            return
+        while self._task_snip_box.count():
+            item = self._task_snip_box.takeAt(0)
+            wdg = item.widget()
+            if wdg is not None:
+                wdg.deleteLater()
+        rows: list[tuple[str, str]] = []
+        mission = getattr(self, "_mission", None)
+        tw = getattr(mission, "task_widget", None)
+        if tw is not None and getattr(tw, "_tasks", None):
+            for t in list(tw._tasks)[-4:]:
+                rows.append((t.get("name", "?"), t.get("status", "pending")))
+        else:
+            try:
+                from agent.task_queue import get_queue
+                for st in get_queue().get_all_statuses()[-4:]:
+                    rows.append((st.get("goal", "?"), str(st.get("status", "pending"))))
+            except Exception:
+                rows = []
+        if hasattr(self, "_task_empty_lbl"):
+            self._task_empty_lbl.setVisible(not rows)
+        sym_map = {
+            "active": "▶", "running": "▶", "calling": "◈",
+            "done": "✓", "completed": "✓", "succeeded": "✓",
+            "error": "✗", "failed": "✗",
+            "pending": "○", "queued": "○",
+        }
+        for name, status in rows:
+            key = str(status).lower()
+            sym = sym_map.get(key, "·")
+            col = C.ENERGY if key in ("active", "running", "calling") else (
+                C.TEXT_DIM if key in ("pending", "queued") else (
+                    C.RED if key in ("error", "failed") else C.ACC2
+                )
+            )
+            label = str(name)
+            if len(label) > 28:
+                label = label[:25] + "…"
+            row = QLabel(f"{sym} {label}")
+            row.setFont(QFont("Courier New", 7))
+            row.setStyleSheet(f"color: {col}; background: transparent;")
+            self._task_snip_box.addWidget(row)
+
+    def _sync_status_card(self):
+        """Keep the STATUS card state/provider in sync with the HUD."""
+        if hasattr(self, "_status_state_lbl") and hasattr(self, "hud"):
+            state = getattr(self.hud, "state", "LISTENING")
+            self._status_state_lbl.setText(state)
+        if hasattr(self, "_status_provider_lbl"):
+            try:
+                self._status_provider_lbl.setText(_load_provider_preference().upper())
+            except Exception:
+                pass
+        if hasattr(self, "_rail_status_dot_lbl") and hasattr(self, "hud"):
+            state = getattr(self.hud, "state", "LISTENING")
+            col = {
+                "MUTED": C.TEXT_DIM, "THINKING": C.ACC2, "PROCESSING": C.ACC2,
+                "SPEAKING": C.ENERGY, "LISTENING": C.ACC2,
+            }.get(state, C.TEXT_DIM)
+            self._rail_status_dot_lbl.setStyleSheet(
+                f"color: {col}; background: transparent;"
+            )
+
 
     def _feed_sparklines(self):
         """Feed sparkline bars from existing metric bar data."""
@@ -7811,7 +8167,7 @@ class MainWindow(QMainWindow):
                 "THINKING": C.ACC2,
                 "PROCESSING": C.ACC2,
                 "SPEAKING": C.PRI,
-                "LISTENING": C.GREEN,
+                "LISTENING": C.ACC2,
             }.get(state, C.TEXT_DIM)
             self._rail_mode_lbl.setStyleSheet(
                 f"color: {rail_color}; background: transparent; letter-spacing: 1px;"
@@ -7846,6 +8202,8 @@ class MainWindow(QMainWindow):
         # Sync compact mode widget state
         if self._compact_widget:
             self._compact_widget.set_state(state)
+        if hasattr(self, "_sync_status_card"):
+            self._sync_status_card()
 
         # Show toast for state transitions
         if state == "THINKING":
@@ -7976,8 +8334,8 @@ class MainWindow(QMainWindow):
             self._voice_combo.setCurrentIndex(idx)
         self._voice_combo.blockSignals(False)
 
-    def _show_setup(self):
-        ov = SetupOverlay(self.centralWidget())
+    def _show_setup(self, initial_provider: str | None = None):
+        ov = SetupOverlay(self.centralWidget(), initial_provider=initial_provider)
         cw = self.centralWidget()
         ow, oh = 460, 420
         ov.setGeometry(
@@ -7990,7 +8348,7 @@ class MainWindow(QMainWindow):
         self._overlay = ov
 
     def _on_setup_done(self, key: str, os_name: str, remember_key: bool):
-        provider = getattr(self._overlay, "_selected_provider", "gemini") if self._overlay else "gemini"
+        provider = getattr(self._overlay, "_selected_provider", "ollama") if self._overlay else "ollama"
 
         # For Ollama — no key needed
         if provider == "ollama":
