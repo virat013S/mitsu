@@ -4725,7 +4725,6 @@ class SetupOverlay(QWidget):
             prov_row.addWidget(btn)
             self._prov_btns[key] = btn
         layout.addLayout(prov_row)
-        self._sel_provider("gemini")
         layout.addSpacing(6)
 
         sep_prov = QFrame(); sep_prov.setFrameShape(QFrame.Shape.HLine)
@@ -4782,6 +4781,7 @@ class SetupOverlay(QWidget):
         key_layout.addWidget(self._remember_key)
 
         layout.addWidget(self._key_section)
+        self._sel_provider("gemini")
 
         layout.addSpacing(6)
 
