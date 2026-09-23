@@ -126,7 +126,7 @@ def web_search(
     aspect = params.get("aspect", "general").strip() or "general"
 
     if not query and not items:
-        return "Please provide a search query, sir."
+        return "Please provide a search query."
 
     if items and mode != "compare":
         mode = "compare"
@@ -157,4 +157,4 @@ def web_search(
 
     except Exception as e:
         print(f"[WebSearch] ❌ All backends failed: {e}")
-        return f"Search failed, sir: {e}"
+        return f"Search failed: {e}"

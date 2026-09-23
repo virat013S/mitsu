@@ -145,7 +145,7 @@ def run_command(parameters: dict, player=None, speak=None) -> str:
     os.chmod(script_file, 0o700)
 
     if speak:
-        speak("I need your permission, sir. Please enter your password in the window that just opened.")
+        speak("I need your permission. Please enter your password in the window that just opened.")
 
     launch_args = _terminal_launch_args(terminal, str(script_file))
     try:

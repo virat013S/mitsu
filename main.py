@@ -96,7 +96,7 @@ STARTUP_CLAPS_REQUIRED = 2
 STARTUP_CLAP_MAX_GAP_SECONDS = 4.0
 STARTUP_CLAP_COOLDOWN_SECONDS = 0.22
 SELF_QUIT_GOODBYE = (
-    "Certainly, sir. It has been a privilege. MITSU is going offline now. "
+    "Certainly. It has been a privilege. MITSU is going offline now. "
     "Until next time."
 )
 
@@ -344,19 +344,76 @@ def _load_voice_name() -> str:
         return DEFAULT_VOICE_NAME
 
 
+def _current_user_name() -> str:
+    """Resolve the user's real name: memory first, then CLI username file."""
+    # Memory (UI identity store)
+    try:
+        from memory.memory_manager import load_memory
+        entry = load_memory().get("identity", {}).get("name")
+        val = entry.get("value") if isinstance(entry, dict) else entry
+        if isinstance(val, str) and val.strip() and val.strip().lower() not in ("sir", "madam", "madame", "friend"):
+            return val.strip()
+    except Exception:
+        pass
+    # CLI username file
+    try:
+        if USERNAME_FILE.exists():
+            name = USERNAME_FILE.read_text(encoding="utf-8").strip()
+            if name and name.lower() not in ("sir", "madam", "madame", "friend"):
+                return name
+    except Exception:
+        pass
+    return ""
+
+
+def _sync_username_stores() -> str:
+    """Ensure username.txt and memory identity agree. Returns the resolved name."""
+    name = _current_user_name()
+    if not name:
+        return ""
+    try:
+        USERNAME_FILE.parent.mkdir(parents=True, exist_ok=True)
+        if not USERNAME_FILE.exists() or USERNAME_FILE.read_text(encoding="utf-8").strip() != name:
+            USERNAME_FILE.write_text(name, encoding="utf-8")
+    except Exception:
+        pass
+    try:
+        from memory.memory_manager import load_memory, update_memory
+        entry = load_memory().get("identity", {}).get("name")
+        mem_name = entry.get("value") if isinstance(entry, dict) else entry
+        if (mem_name or "").strip() != name:
+            update_memory({"identity": {"name": {"value": name}}})
+    except Exception:
+        pass
+    return name
+
+
 def _load_system_prompt() -> str:
+    name = _current_user_name()
+    if name:
+        addr = (
+            f"\n\n[USER IDENTITY]\n"
+            f"The user's name is {name}.\n"
+            f"Always address them as {name} (by name). "
+            f"NEVER call them 'sir', 'madam', 'Sir', or 'Madam'. "
+            f"When asked for the user's name or username, answer '{name}'. "
+            f"When asked who you are talking to, answer '{name}'."
+        )
+    else:
+        addr = (
+            "\n\n[USER IDENTITY]\n"
+            "No name is set yet. If the user shares their name, remember and use it. "
+            "Do not invent a name and do not default to 'sir' or 'madam'."
+        )
     try:
         prompt = PROMPT_PATH.read_text(encoding="utf-8").strip()
-        return (
-            prompt
-            + "\n\nAlways address the user respectfully as 'Sir' or 'Madam' where appropriate, while remaining efficient and direct."
-        )
+        return prompt + addr
     except Exception:
         return (
-            "You are MITSU, Tony Stark's AI assistant. "
+            "You are MITSU — a warm, witty personal AI assistant. "
             "Be concise, direct, and always use the provided tools to complete tasks. "
-            "Never simulate or guess results — always call the appropriate tool. "
-            "Always address the user respectfully as 'Sir' or 'Madam' where appropriate, while remaining efficient and direct."
+            "Never simulate or guess results — always call the appropriate tool."
+            + addr
         )
 
 _CTRL_RE = re.compile(r"<ctrl\d+>", re.IGNORECASE)
@@ -1264,7 +1321,7 @@ class MitsuLive:
     def speak_error(self, tool_name: str, error: str):
         short = str(error)[:120]
         self.ui.write_log(f"ERR: {tool_name} — {short}")
-        self.speak(f"Sir, {tool_name} encountered an error. {short}")
+        self.speak(f"{tool_name} encountered an error. {short}")
 
     @staticmethod
     def _is_explicit_self_quit_transcript(text: str) -> bool:
@@ -1417,10 +1474,12 @@ class MitsuLive:
                 name = name_entry.get("value")
             elif isinstance(name_entry, str):
                 name = name_entry
+            if not name:
+                name = _current_user_name()
             if name:
-                greeting = f"Mitsu. At your service, {name}. What would you like to accomplish today?"
+                greeting = f"Mitsu. Good to see you again, {name}. What would you like to accomplish today?"
             else:
-                greeting = "Mitsu. At your service, Sir or Madam. What would you like to accomplish today?"
+                greeting = "Mitsu here. What would you like to accomplish today?"
             await self.session.send_client_content(
                 turns={"parts": [{"text": greeting}]},
                 turn_complete=True,
@@ -2047,19 +2106,19 @@ class MitsuLive:
                     traceback.print_exc()
 
 BANNER = r"""
-  ╔════════════════════════════════════════════════════════════════╗
-  ║                                                                ║
-  ║    ███╗   ███╗███████╗███████╗████████╗██╗███╗ ██╗██╗  ██╗     ║
-  ║    ████╗ ████║██╔════╝██╔════╝╚══██╔══╝██║████╗██║██║  ██║     ║
-  ║    ██╔████╔██║█████╗  ███████╗   ██║   ██║██╔██╗██║███████║    ║
-  ║    ██║╚██╔╝██║██╔══╝  ╚════██║   ██║   ██║██║╚████║╚════██║    ║
-  ║    ██║ ╚═╝ ██║███████╗███████║   ██║   ██║██║ ╚███║     ██║    ║
-  ║    ╚═╝     ╚═╝╚══════╝╚══════╝   ╚═╝   ╚═╝╚═╝  ╚══╝     ╚═╝    ║
-  ║                                                                ║
-  ║                    Your Custom AI Assistant                    ║
-  ║                          by virat013S                          ║
-  ║                                                                ║
-  ╚════════════════════════════════════════════════════════════════╝
+  ╔══════════════════════════════════════════════════════╗
+  ║                                                      ║
+  ║    ███╗   ███╗███████╗█████████╗███████╗██╗   ██╗    ║
+  ║    ████╗ ████║   ██║  ╚══██╔══╝██╔════╝██║   ██║     ║
+  ║    ██╔████╔██║   ██║     ██║   ███████╗██║   ██║     ║
+  ║    ██║╚██╔╝██║   ██║     ██║   ╚════██║██║   ██║     ║
+  ║    ██║ ╚═╝ ██║   ██║     ██║   ███████║╚██████╔╝     ║
+  ║    ╚═╝     ╚═╝███████╗   ╚═╝   ╚══════╝ ╚═════╝      ║
+  ║                                                      ║
+  ║               Your Custom AI Assistant               ║
+  ║                     by virat013S                     ║
+  ║                                                      ║
+  ╚══════════════════════════════════════════════════════╝
 """
 
 USERNAME_FILE = Path.home() / ".mitsu" / "username.txt"
@@ -2247,8 +2306,8 @@ def main():
     # ── Startup Menu ────────────────────────────────────────────────────────
     _startup_banner()
 
-    # Load or ask for username
-    username = _load_username()
+    # Load or ask for username, then keep both stores in sync
+    username = _load_username() or _current_user_name()
     if not username:
         print("  First time? Let's get to know each other!\n")
         try:
@@ -2261,6 +2320,8 @@ def main():
         print(f"  Nice to meet you, {username}! Let's set things up.\n")
     else:
         print(f"  {_greet_user(username)}\n")
+    _sync_username_stores()
+    username = _current_user_name() or username
 
     # Check saved provider or ask
     saved = _load_provider_config()
@@ -2309,6 +2370,15 @@ def main():
             mitsu.ui.write_log(f"SYS: Locked volume required: {mount_path}")
 
         ui.on_voice_change = mitsu.update_voice
+        def _on_name_changed(new_name: str):
+            try:
+                _save_username(new_name)
+                from memory.memory_manager import update_memory
+                update_memory({"identity": {"name": {"value": new_name}}})
+                mitsu.ui.write_log(f"SYS: Identity updated — {new_name}.")
+            except Exception as e:
+                mitsu.ui.write_log(f"ERR: Could not persist name: {e}")
+        ui.on_name_change = _on_name_changed
         def _on_tts_change(tts_provider, api_key, voice_id):
             if tts_provider == "gemini":
                 mitsu._tts_engine = None
