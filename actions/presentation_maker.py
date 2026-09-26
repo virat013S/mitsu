@@ -43,7 +43,15 @@ from actions.presentations.sources import ingest_sources, source_manifest
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 API_CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
-DEFAULT_MODEL = "gemini-2.5-flash"
+# NOTE: the Gemini model resolves per-call via core.models (user
+# selection), not from a constant here.
+
+
+def _selected_gemini_model() -> str:
+    """User-selected Gemini model (never a hard-coded id)."""
+    from core.models import gemini_text_model
+    return gemini_text_model()
+
 PRESENTATION_PENDING_TTL_SECONDS = 15 * 60
 PRESENTATION_QUOTA_COOLDOWN_SECONDS = 5 * 60
 PRESENTATION_RUN_MODE_QUESTION = (
@@ -351,7 +359,7 @@ Return JSON only in this shape:
                 bundle.warnings.append(f"Could not analyze media source {media_path.name}: {exc}")
     try:
         response = client.models.generate_content(
-            model=DEFAULT_MODEL,
+            model=_selected_gemini_model(),
             contents=contents,
             config={"response_mime_type": "application/json"},
         )
@@ -1432,7 +1440,7 @@ def _revise_plan(
     )
     client = genai.Client(api_key=_api_key())
     response = client.models.generate_content(
-        model=DEFAULT_MODEL,
+        model=_selected_gemini_model(),
         contents=prompt,
         config={"response_mime_type": "application/json"},
     )

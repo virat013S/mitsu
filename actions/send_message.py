@@ -319,6 +319,12 @@ def _get_api_key() -> str:
         return ""
 
 
+def _selected_gemini_model() -> str:
+    """User-selected Gemini model (never a hard-coded id)."""
+    from core.models import gemini_text_model
+    return gemini_text_model()
+
+
 def _require_pyautogui():
     if not _PYAUTOGUI:
         raise RuntimeError("PyAutoGUI not installed. Run: pip install pyautogui")
@@ -1530,7 +1536,7 @@ def _screen_find(description: str, retries: int = 2, delay: float = 0.6) -> tupl
             )
             client = genai.Client(api_key=api_key)
             response = client.models.generate_content(
-                model="gemini-2.5-flash-lite",
+                model=_selected_gemini_model(),
                 contents=[
                     gtypes.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"),
                     prompt,

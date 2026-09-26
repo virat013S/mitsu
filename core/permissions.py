@@ -105,3 +105,69 @@ def check_sudo_available() -> bool:
         return result.returncode == 0
     except Exception:
         return False
+
+
+# ── Tool risk classification ───────────────────────────────────────────────
+# LOW:      read-only / system information.
+# MEDIUM:   application control, file modification, browser automation.
+# HIGH:     sending messages, shell execution, installs, data deletion.
+# CRITICAL: irreversible / destructive operations (power, disk destructive).
+
+RISK_LOW = "low"
+RISK_MEDIUM = "medium"
+RISK_HIGH = "high"
+RISK_CRITICAL = "critical"
+
+TOOL_RISK: dict[str, str] = {
+    # Read-only / informational
+    "web_search": RISK_LOW,
+    "deep_research": RISK_LOW,
+    "flight_finder": RISK_LOW,
+    "youtube_video": RISK_LOW,
+    "task_status": RISK_LOW,
+    "check_messages": RISK_LOW,
+    "screen_process": RISK_LOW,
+    "graphics_quality": RISK_LOW,
+    "mitsu_ui_control": RISK_LOW,
+    "save_memory": RISK_LOW,
+    # Application control / file modification / browser automation
+    "open_app": RISK_MEDIUM,
+    "browser_control": RISK_MEDIUM,
+    "file_controller": RISK_MEDIUM,
+    "file_processor": RISK_MEDIUM,
+    "code_helper": RISK_MEDIUM,
+    "dev_agent": RISK_MEDIUM,
+    "media_control": RISK_MEDIUM,
+    "desktop_control": RISK_MEDIUM,
+    "computer_settings": RISK_MEDIUM,
+    "reminder": RISK_MEDIUM,
+    "prepare_message_reply": RISK_MEDIUM,
+    "create_presentation": RISK_MEDIUM,
+    "agent_task": RISK_MEDIUM,
+    "game_updater": RISK_MEDIUM,
+    # Sending / shell execution / deletion-capable
+    "send_message": RISK_HIGH,
+    "email_control": RISK_HIGH,
+    "computer_control": RISK_HIGH,
+}
+
+# Sub-actions that escalate to CRITICAL regardless of their tool's level.
+CRITICAL_PATTERNS = (
+    "shutdown", "restart", "reboot", "poweroff", "halt",
+    "rm -rf /", "mkfs", "format",
+)
+
+
+def tool_risk(tool_name: str, parameters: dict | None = None) -> str:
+    """Risk level for a tool call, escalated by critical parameters."""
+    base = TOOL_RISK.get(tool_name, RISK_MEDIUM)
+    if parameters:
+        blob = " ".join(str(v).lower() for v in parameters.values())
+        if any(pat in blob for pat in CRITICAL_PATTERNS):
+            return RISK_CRITICAL
+    return base
+
+
+def needs_approval(tool_name: str, parameters: dict | None = None) -> bool:
+    """True when a tool call requires explicit user approval."""
+    return tool_risk(tool_name, parameters) in (RISK_HIGH, RISK_CRITICAL)

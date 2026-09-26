@@ -79,6 +79,21 @@ def _get_api_key() -> str:
     return key
 
 
+def _selected_gemini_model() -> str:
+    """User-selected Gemini model (never a hard-coded id)."""
+    from core.models import gemini_text_model
+    return gemini_text_model()
+
+
+def _pick_live_model(client) -> str:
+    """Live-capable model: user selection/config first, default fallback."""
+    try:
+        from core.live_model import pick_live_model
+        return pick_live_model(client, _CONFIG_PATH)
+    except Exception:
+        return _LIVE_MODEL
+
+
 def _get_os() -> str:
     return _load_config().get("os_system", "windows").lower()
 
@@ -228,7 +243,7 @@ def _direct_vision_answer(image_bytes: bytes, mime_type: str, user_text: str) ->
         f"User question: {user_text}"
     )
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model=_selected_gemini_model(),
         contents=[
             gtypes.Part.from_bytes(data=image_bytes, mime_type=mime_type),
             prompt,
@@ -328,6 +343,7 @@ class _VisionSession:
         )
 
         backoff = 2.0
+        live_model = _pick_live_model(client)
         while True:
             # Build config each reconnect to pick up voice changes
             voice = _get_voice_name()
@@ -346,7 +362,7 @@ class _VisionSession:
             try:
                 print("[Vision] 🔌 Connecting...")
                 async with client.aio.live.connect(
-                    model=_LIVE_MODEL, config=config
+                    model=live_model, config=config
                 ) as session:
                     self._session = session
                     self._ready_evt.set()

@@ -17,7 +17,8 @@ BASE_DIR           = get_base_dir()
 API_CONFIG_PATH    = BASE_DIR / "config" / "api_keys.json"
 DESKTOP            = Path.home() / "Desktop"
 MAX_BUILD_ATTEMPTS = 3
-GEMINI_MODEL       = "gemini-2.5-flash"
+# NOTE: the Gemini model is resolved per-call via core.models
+# (user selection), not from a constant here.
 
 
 def _get_api_key() -> str:
@@ -29,9 +30,15 @@ def _get_api_key() -> str:
     return key
 
 
-def _get_gemini(model: str = GEMINI_MODEL):
+def _get_gemini(model: str | None = None):
     from core.llm import get_model
     return get_model(sensitive=True)
+
+
+def _selected_gemini_model() -> str:
+    """User-selected Gemini model (never a hard-coded id)."""
+    from core.models import gemini_text_model
+    return gemini_text_model()
 
 
 def _clean_code(text: str) -> str:
@@ -482,7 +489,7 @@ Be specific and actionable. If you see an error message, quote it exactly."""
         ]
 
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=_selected_gemini_model(),
             contents=contents,
         )
 

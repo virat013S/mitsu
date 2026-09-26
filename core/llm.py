@@ -83,7 +83,14 @@ def _openai_client(name: str, cfg: dict):
 
 def _call_openai_provider(name: str, prompt: str, system: str | None) -> str:
     cfg = _OPENAI_PROVIDERS[name]
-    model = os.environ.get(cfg["model_env"], cfg["model"]).strip() or cfg["model"]
+    model = os.environ.get(cfg["model_env"], "").strip()
+    if not model and name == "openrouter":
+        try:
+            from core.models import resolve_model
+            model = resolve_model("openrouter")
+        except Exception:
+            model = ""
+    model = model or cfg["model"]
     client = _openai_client(name, cfg)
     messages = []
     if system:
@@ -99,8 +106,9 @@ def _call_gemini(prompt: str, system: str | None) -> str:
     if not key:
         raise RuntimeError("Gemini API key not found")
     genai.configure(api_key=key)
+    from core.models import gemini_text_model
     model = genai.GenerativeModel(
-        model_name=os.environ.get("MITSU_GEMINI_MODEL", "gemini-2.5-flash"),
+        model_name=os.environ.get("MITSU_GEMINI_MODEL", "").strip() or gemini_text_model(),
         system_instruction=system,
     )
     response = model.generate_content(prompt)

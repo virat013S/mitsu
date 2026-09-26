@@ -5,11 +5,18 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, Any
 from memory.task_history import record_task
+from core.events import emit as emit_event
+from core.events import (
+    TASK_CREATED, TASK_STARTED, TASK_PROGRESS,
+    TASK_PAUSED, TASK_RESUMED, TASK_CANCELLED,
+    TASK_FAILED, TASK_COMPLETED,
+)
 
 
 class TaskStatus(Enum):
     PENDING    = "pending"
     RUNNING    = "running"
+    PAUSED     = "paused"
     COMPLETED  = "completed"
     FAILED     = "failed"
     CANCELLED  = "cancelled"
@@ -41,6 +48,8 @@ class Task:
     warnings:    list[str]  = field(compare=False, default_factory=list)
     user_id:     str | None = field(compare=False, default=None)
     cancel_flag: threading.Event = field(compare=False, default_factory=threading.Event)
+    pause_flag:  threading.Event = field(compare=False, default_factory=threading.Event)
+    _executing:  bool = field(compare=False, default=False)
 
 
 class TaskQueue:
@@ -125,6 +134,11 @@ class TaskQueue:
             print(f"[TaskQueue] ⚡ Task started immediately: [{task_id}] {goal[:60]}")
         else:
             print(f"[TaskQueue] 📥 Task queued: [{task_id}] {goal[:60]}")
+        try:
+            emit_event(TASK_CREATED, task_id=task_id, goal=goal,
+                       kind="agent", priority=priority.value)
+        except Exception:
+            pass
         return task_id
 
     def submit_job(
@@ -159,6 +173,11 @@ class TaskQueue:
             self._tasks[task_id] = task
             self._condition.notify()
         print(f"[TaskQueue] 📥 {kind} job queued: [{task_id}] {goal[:60]}")
+        try:
+            emit_event(TASK_CREATED, task_id=task_id, goal=goal,
+                       kind=kind, priority=priority.value)
+        except Exception:
+            pass
         return task_id
 
     def cancel(self, task_id: str) -> bool:
@@ -171,17 +190,70 @@ class TaskQueue:
                 return False
 
             task.cancel_flag.set()
+            task.pause_flag.clear()
             task.status = TaskStatus.CANCELLED
             task.phase = "Cancelled"
             on_cancel = task.on_cancel
             if task in self._queue:
                 self._queue.remove(task)
             print(f"[TaskQueue] 🚫 Task cancelled: [{task_id}]")
+        try:
+            emit_event(TASK_CANCELLED, task_id=task_id, goal=task.goal)
+        except Exception:
+            pass
         if on_cancel:
             try:
                 on_cancel()
             except Exception as exc:
                 print(f"[TaskQueue] ⚠️ on_cancel callback error: {exc}")
+        with self._condition:
+            self._condition.notify_all()
+        return True
+
+    def pause(self, task_id: str) -> bool:
+        """Pause a pending or running task; it can be resumed later.
+
+        Pending tasks stay queued but are skipped by the worker.
+        Running executor tasks block between steps until resumed.
+        Custom runners (submit_job) only honor pause while queued.
+        """
+        with self._lock:
+            task = self._tasks.get(task_id)
+            if not task:
+                return False
+            if task.status in (TaskStatus.COMPLETED, TaskStatus.FAILED,
+                               TaskStatus.CANCELLED, TaskStatus.PAUSED):
+                return False
+            task.pause_flag.set()
+            task.status = TaskStatus.PAUSED
+            task.phase = "Paused"
+            print(f"[TaskQueue] ⏸️ Task paused: [{task_id}]")
+        try:
+            emit_event(TASK_PAUSED, task_id=task_id, goal=task.goal)
+        except Exception:
+            pass
+        with self._condition:
+            self._condition.notify_all()
+        return True
+
+    def resume(self, task_id: str) -> bool:
+        """Resume a paused task from its preserved state."""
+        with self._lock:
+            task = self._tasks.get(task_id)
+            if not task or task.status != TaskStatus.PAUSED:
+                return False
+            task.pause_flag.clear()
+            if task._executing:
+                task.status = TaskStatus.RUNNING
+                task.phase = "Resumed"
+            else:
+                task.status = TaskStatus.PENDING
+                task.phase = "Queued"
+            print(f"[TaskQueue] ▶️ Task resumed: [{task_id}]")
+        try:
+            emit_event(TASK_RESUMED, task_id=task_id, goal=task.goal)
+        except Exception:
+            pass
         with self._condition:
             self._condition.notify_all()
         return True
@@ -205,6 +277,7 @@ class TaskQueue:
                 "kind": task.kind,
                 "progress": task.progress,
                 "phase": task.phase,
+                "paused": task.pause_flag.is_set(),
                 "artifacts": list(task.artifacts),
                 "warnings": list(task.warnings),
             }
@@ -270,6 +343,13 @@ class TaskQueue:
 
     def _run_task_inner(self, task: Task) -> None:
         print(f"[TaskQueue] ▶️ Running: [{task.task_id}] {task.goal[:60]}")
+        with self._lock:
+            task._executing = True
+        try:
+            emit_event(TASK_STARTED, task_id=task.task_id, goal=task.goal,
+                       kind=task.kind)
+        except Exception:
+            pass
         try:
             def update_progress(
                 percent: int | None = None,
@@ -286,6 +366,11 @@ class TaskQueue:
                         task.artifacts = [str(item) for item in artifacts]
                     if warnings is not None:
                         task.warnings = [str(item) for item in warnings]
+                try:
+                    emit_event(TASK_PROGRESS, task_id=task.task_id,
+                               progress=task.progress, phase=task.phase)
+                except Exception:
+                    pass
 
             if task.runner:
                 update_progress(1, "Starting")
@@ -300,6 +385,7 @@ class TaskQueue:
                     goal=task.goal,
                     speak=task.speak,
                     cancel_flag=task.cancel_flag,
+                    pause_flag=task.pause_flag,
                 )
                 step_results = getattr(executor, "last_step_results", {}) or {}
                 if step_results:
@@ -361,6 +447,16 @@ class TaskQueue:
                     print(f"[TaskQueue] ⚠️ task history save failed: {e}")
 
             print(f"[TaskQueue] ✅ Completed: [{task.task_id}]")
+            try:
+                if task.cancel_flag.is_set():
+                    emit_event(TASK_CANCELLED, task_id=task.task_id,
+                               goal=task.goal)
+                else:
+                    emit_event(TASK_COMPLETED, task_id=task.task_id,
+                               goal=task.goal, kind=task.kind,
+                               progress=task.progress)
+            except Exception:
+                pass
 
         except Exception as e:
             with self._lock:
@@ -404,7 +500,15 @@ class TaskQueue:
                 print(f"[TaskQueue] 🚫 Cancelled: [{task.task_id}]")
             else:
                 print(f"[TaskQueue] ❌ Failed: [{task.task_id}] {e}")
+            try:
+                emit_event(TASK_CANCELLED if cancelled else TASK_FAILED,
+                           task_id=task.task_id, goal=task.goal,
+                           error="" if cancelled else str(e))
+            except Exception:
+                pass
 
+        with self._lock:
+            task._executing = False
         with self._condition:
             self._condition.notify()
 

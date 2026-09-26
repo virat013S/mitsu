@@ -21,7 +21,16 @@ def configured_live_model(config_path: Path) -> str:
         ).strip()
     except Exception:
         configured = ""
-    return configured or DEFAULT_LIVE_MODEL
+    if configured:
+        return configured
+    try:
+        from core.models import explicit_selection
+        selection = explicit_selection()
+        if selection is not None and selection["provider"] == "gemini":
+            return selection["model"]
+    except Exception:
+        pass
+    return DEFAULT_LIVE_MODEL
 
 
 def _model_name(model) -> str:

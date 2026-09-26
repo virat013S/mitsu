@@ -24,7 +24,18 @@ def _base_dir() -> Path:
 
 
 BASE_DIR = _base_dir()
-SYNTHESIS_MODELS = ("gemini-2.5-flash-lite", "gemini-2.5-flash")
+def _synthesis_models() -> tuple[str, ...]:
+    """Gemini synthesis chain: user selection first, then lite/flash.
+
+    The user's selected model leads; the curated fallbacks only run if
+    it fails. Never silently replaces the selection."""
+    try:
+        from core.models import gemini_text_model
+        selected = gemini_text_model()
+    except Exception:
+        selected = ""
+    chain = [m for m in (selected, "gemini-2.5-flash-lite", "gemini-2.5-flash") if m]
+    return tuple(dict.fromkeys(chain))
 
 DEPTH_CONFIG = {
     "quick": {"queries": 3, "max_sources": 10},
@@ -469,7 +480,7 @@ VERIFIED SOURCE CATALOG
 {source_catalog}
 """.strip()
     errors = []
-    for model in SYNTHESIS_MODELS:
+    for model in _synthesis_models():
         try:
             response = client.models.generate_content(model=model, contents=prompt)
             report = _response_text(response)

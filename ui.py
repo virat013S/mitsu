@@ -4130,6 +4130,7 @@ class _DropCanvas(QWidget):
 class SetupOverlay(QWidget):
     done = pyqtSignal(str, str, bool)
     validation_finished = pyqtSignal(bool, str, str, bool)
+    models_finished = pyqtSignal(list)
 
 
     def paintEvent(self, event):
@@ -4161,7 +4162,10 @@ class SetupOverlay(QWidget):
         if preferred not in ("gemini", "ollama", "openrouter"):
             preferred = "ollama"
         self._selected_provider = preferred
+        self._model_infos: list = []
+        self._selected_model = ""
         self.validation_finished.connect(self._on_validation_finished)
+        self.models_finished.connect(self._on_models_finished)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 22, 30, 22)
@@ -4207,6 +4211,55 @@ class SetupOverlay(QWidget):
 
         sep_prov = QFrame(); sep_prov.setFrameShape(QFrame.Shape.HLine)
         sep_prov.setStyleSheet(f"color: {C.BORDER};"); layout.addWidget(sep_prov)
+        layout.addSpacing(4)
+
+        # ── Model Selector (per-provider, dynamic) ───────────────────────
+        layout.addWidget(_lbl("AI MODEL", 8, color=C.TEXT_DIM,
+                               align=Qt.AlignmentFlag.AlignLeft))
+
+        model_row = QHBoxLayout(); model_row.setSpacing(6)
+        self._model_combo = QComboBox()
+        self._model_combo.setEditable(True)
+        self._model_combo.setFont(QFont("Courier New", 9))
+        self._model_combo.setFixedHeight(30)
+        self._model_combo.setStyleSheet(f"""
+            QComboBox {{
+                background: {C.DARK}; color: {C.TEXT};
+                border: 1px solid {C.BORDER}; border-radius: 3px; padding: 2px 8px;
+            }}
+        """)
+        self._model_combo.currentIndexChanged.connect(self._on_model_changed)
+        try:
+            self._model_combo.editTextChanged.connect(
+                lambda _t: self._on_model_changed(self._model_combo.currentIndex()))
+        except Exception:
+            pass
+        model_row.addWidget(self._model_combo, 1)
+
+        self._model_refresh_btn = QPushButton("⟳")
+        self._model_refresh_btn.setFont(QFont("Courier New", 10, QFont.Weight.Bold))
+        self._model_refresh_btn.setFixedSize(30, 30)
+        self._model_refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._model_refresh_btn.setToolTip("Re-detect available models")
+        self._model_refresh_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {C.TEXT_DIM};
+                border: 1px solid {C.BORDER}; border-radius: 3px;
+            }}
+            QPushButton:hover {{ color: {C.TEXT}; border: 1px solid {C.BORDER_B}; }}
+        """)
+        self._model_refresh_btn.clicked.connect(self._refresh_models)
+        model_row.addWidget(self._model_refresh_btn)
+        layout.addLayout(model_row)
+
+        self._model_hint = _lbl("", 7, color=C.TEXT_MED,
+                                align=Qt.AlignmentFlag.AlignLeft)
+        self._model_hint.setWordWrap(True)
+        layout.addWidget(self._model_hint)
+        layout.addSpacing(4)
+
+        sep_model = QFrame(); sep_model.setFrameShape(QFrame.Shape.HLine)
+        sep_model.setStyleSheet(f"color: {C.BORDER};"); layout.addWidget(sep_model)
         layout.addSpacing(4)
 
         # ── API Key Section (hidden for Ollama) ────────────────────────────
@@ -4356,6 +4409,113 @@ class SetupOverlay(QWidget):
                 self._key_label.setText("OPENROUTER API KEY")
                 self._key_input.setPlaceholderText("Paste OpenRouter API key")
                 self._validation_lbl.setText("Get a free key at openrouter.ai/keys")
+        self._refresh_models()
+
+    def _refresh_models(self):
+        """Detect selectable models for the current provider (background)."""
+        provider = self._selected_provider
+        self._model_combo.setEnabled(False)
+        self._model_hint.setText("Detecting models…")
+        key = self._key_input.text().strip() if provider != "ollama" else ""
+
+        def _fetch():
+            try:
+                from core.models import catalog
+                infos = catalog(provider, api_key=key)
+                self.models_finished.emit([i.to_dict() for i in infos])
+            except Exception:
+                self.models_finished.emit([])
+
+        threading.Thread(target=_fetch, daemon=True).start()
+
+    def _on_models_finished(self, infos: list):
+        self._model_infos = infos or []
+        self._model_combo.blockSignals(True)
+        self._model_combo.clear()
+        for info in self._model_infos:
+            label = info.get("label") or info.get("id", "")
+            meta = []
+            if info.get("params_b"):
+                meta.append(f'{info["params_b"]:g}B')
+            if info.get("free") is True:
+                meta.append("free")
+            elif info.get("free") is False:
+                meta.append("paid")
+            if info.get("warning"):
+                meta.append("!")
+            if meta:
+                label = f'{label} [{", ".join(meta)}]'
+            self._model_combo.addItem(label, info.get("id", ""))
+        # Pre-select: stored choice for this provider, else first available.
+        try:
+            from core.models import explicit_selection, default_model
+            sel = explicit_selection()
+            wanted = sel["model"] if sel and sel["provider"] == self._selected_provider else ""
+            if not wanted:
+                try:
+                    wanted = default_model(self._selected_provider)
+                except Exception:
+                    wanted = ""
+        except Exception:
+            wanted = ""
+        idx = self._model_combo.findData(wanted) if wanted else -1
+        if idx < 0:
+            for i, info in enumerate(self._model_infos):
+                if info.get("available"):
+                    idx = i
+                    break
+        if idx < 0 and self._model_combo.count():
+            idx = 0
+        if idx >= 0:
+            self._model_combo.setCurrentIndex(idx)
+        self._model_combo.blockSignals(False)
+        self._model_combo.setEnabled(True)
+        self._on_model_changed(self._model_combo.currentIndex())
+
+    def _on_model_changed(self, idx: int):
+        model_id = ""
+        typed = self._model_combo.currentText().strip()
+        if 0 <= idx < len(self._model_infos) and self._model_combo.itemText(idx) == typed:
+            model_id = self._model_infos[idx].get("id", "")
+        if not model_id:
+            # Custom typed id (or list not loaded yet).
+            model_id = typed
+        self._selected_model = model_id
+        self._model_hint.setText(self._model_hint_text(model_id))
+
+    def _model_hint_text(self, model_id: str) -> str:
+        for info in self._model_infos:
+            if info.get("id") == model_id:
+                parts = []
+                parts.append("local" if info.get("local") else "cloud")
+                caps = info.get("capabilities", [])
+                if "tool_calling" in caps:
+                    parts.append("tools")
+                if "vision" in caps:
+                    parts.append("vision")
+                if "audio_input" in caps or "live_voice" in caps:
+                    parts.append("voice")
+                text = f'{info.get("label", model_id)} · {", ".join(parts)}'
+                if info.get("warning"):
+                    text += f' — {info["warning"]}'
+                return text
+        if model_id:
+            return f"{model_id} · custom id"
+        return "No model detected."
+
+    def _selected_model_id(self) -> str:
+        model_id = (self._selected_model or "").strip()
+        if not model_id:
+            model_id = self._model_combo.currentText().strip()
+        if not model_id:
+            try:
+                from core.models import get_selection
+                sel = get_selection()
+                if sel["provider"] == self._selected_provider:
+                    model_id = sel["model"]
+            except Exception:
+                pass
+        return model_id
 
     def _toggle_remember_key(self):
         # Simple visual toggle; actual persistence logic lives in _on_setup_done
@@ -4718,6 +4878,8 @@ class SettingsOverlay(_OverlayBase):
     name_changed = pyqtSignal(str)
     theme_changed = pyqtSignal(str)
     graphics_changed = pyqtSignal(str)
+    model_changed = pyqtSignal(str, str)  # ai provider, model id
+    ai_models_finished = pyqtSignal(list)
 
     def __init__(self, parent=None, current_name: str = "",
                  current_voice: str = "puck", current_theme: str = "mitsu_noir",
@@ -4768,7 +4930,7 @@ class SettingsOverlay(_OverlayBase):
         tb_lay.setSpacing(4)
 
         self._s_tabs: list[QPushButton] = []
-        self._s_tab_names = ["IDENTITY", "THEME", "GRAPHICS"]
+        self._s_tab_names = ["IDENTITY", "THEME", "GRAPHICS", "AI MODEL"]
         self._s_active_tab = 0
 
         for i, name in enumerate(self._s_tab_names):
@@ -4900,6 +5062,102 @@ class SettingsOverlay(_OverlayBase):
         gfx_lay.addStretch()
         self._s_stack.addWidget(gfx_page)
 
+        # Page 3: AI model. Provider + model + fallback. Switching never
+        # touches identity, memory, tasks, or artifacts.
+        ai_page = QWidget()
+        ai_page.setStyleSheet("background: transparent;")
+        ai_lay = QVBoxLayout(ai_page)
+        ai_lay.setContentsMargins(4, 8, 4, 4)
+        ai_lay.setSpacing(8)
+        ai_lay.addWidget(_lbl(
+            "AI PROVIDER", 8, bold=True, color_role="WHITE_DIM",
+            align=Qt.AlignmentFlag.AlignLeft,
+        ))
+
+        ai_prov_row = QHBoxLayout()
+        ai_prov_row.setSpacing(8)
+        self._ai_prov_btns: dict[str, QPushButton] = {}
+        for prov_key, prov_label in [
+            ("ollama", "⚡ Local"), ("openrouter", "🌐 OpenRouter"),
+            ("gemini", "☁ Gemini"),
+        ]:
+            btn = QPushButton(prov_label)
+            btn.setFont(QFont(UI_FONT, 8, QFont.Weight.Medium))
+            btn.setFixedHeight(28)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(
+                lambda _, k=prov_key: self._select_ai_provider(k))
+            self._ai_prov_btns[prov_key] = btn
+            ai_prov_row.addWidget(btn, stretch=1)
+        ai_lay.addLayout(ai_prov_row)
+
+        ai_lay.addWidget(_lbl(
+            "MODEL", 8, bold=True, color_role="WHITE_DIM",
+            align=Qt.AlignmentFlag.AlignLeft,
+        ))
+        ai_model_row = QHBoxLayout()
+        ai_model_row.setSpacing(8)
+        self._ai_model_combo = QComboBox()
+        self._ai_model_combo.setEditable(True)
+        self._ai_model_combo.setFont(QFont(UI_FONT, 8))
+        self._ai_model_combo.setFixedHeight(28)
+        self._ai_model_combo.setStyleSheet(f"""
+            QComboBox {{
+                background: {C.DARK}; color: {C.WHITE};
+                border: 1px solid {C.BORDER_B}; border-radius: 4px;
+                padding: 2px 8px;
+            }}
+        """)
+        self._ai_model_combo.currentIndexChanged.connect(
+            self._on_ai_model_changed)
+        ai_model_row.addWidget(self._ai_model_combo, 1)
+        self._ai_model_refresh = QPushButton("⟳")
+        self._ai_model_refresh.setFixedSize(28, 28)
+        self._ai_model_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._ai_model_refresh.setToolTip("Re-detect available models")
+        self._ai_model_refresh.clicked.connect(self._refresh_ai_models)
+        ai_model_row.addWidget(self._ai_model_refresh)
+        ai_lay.addLayout(ai_model_row)
+
+        self._ai_model_hint = QLabel("")
+        self._ai_model_hint.setFont(QFont(UI_FONT, 8))
+        self._ai_model_hint.setWordWrap(True)
+        self._ai_model_hint.setStyleSheet(
+            f"color: {C.TEXT_MED}; background: transparent;")
+        ai_lay.addWidget(self._ai_model_hint)
+
+        ai_lay.addWidget(_lbl(
+            "MODEL FALLBACK", 8, bold=True, color_role="WHITE_DIM",
+            align=Qt.AlignmentFlag.AlignLeft,
+        ))
+        ai_fb_row = QHBoxLayout()
+        ai_fb_row.setSpacing(8)
+        self._ai_fb_btns: dict[str, QPushButton] = {}
+        for fb_key, fb_label in [
+            ("never", "Never"), ("ask", "Ask first"), ("auto", "Automatic"),
+        ]:
+            btn = QPushButton(fb_label)
+            btn.setFont(QFont(UI_FONT, 8, QFont.Weight.Medium))
+            btn.setFixedHeight(26)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(
+                lambda _, k=fb_key: self._select_ai_fallback(k))
+            self._ai_fb_btns[fb_key] = btn
+            ai_fb_row.addWidget(btn, stretch=1)
+        ai_lay.addLayout(ai_fb_row)
+
+        self._ai_status = QLabel("")
+        self._ai_status.setFont(QFont(UI_FONT, 8))
+        self._ai_status.setStyleSheet(
+            f"color: {C.TEXT_MED}; background: transparent;")
+        ai_lay.addWidget(self._ai_status)
+        ai_lay.addStretch()
+        self._s_stack.addWidget(ai_page)
+        self._ai_models: list = []
+        self._ai_provider = ""
+        self.ai_models_finished.connect(self._on_ai_models)
+        self._load_ai_state()
+
         self._switch_s_tab(0)
         self._highlight_theme(current_theme)
         self._highlight_graphics(self._current_graphics)
@@ -4938,6 +5196,179 @@ class SettingsOverlay(_OverlayBase):
         self._highlight_graphics(value)
         self._graphics_note.setText(f"{value.upper()} quality active.")
         self.graphics_changed.emit(value)
+
+    # ── AI model tab ───────────────────────────────────────────────────
+    def _load_ai_state(self):
+        try:
+            from core.models import get_selection
+            sel = get_selection()
+        except Exception:
+            sel = {"provider": "ollama", "model": "", "fallback": "ask"}
+        self._ai_provider = sel.get("provider", "ollama") or "ollama"
+        self._ai_fallback = sel.get("fallback", "ask") or "ask"
+        self._highlight_ai_provider()
+        self._highlight_ai_fallback()
+        self._refresh_ai_models(preselect=sel.get("model", ""))
+
+    def _highlight_ai_provider(self):
+        for key, btn in self._ai_prov_btns.items():
+            if key == self._ai_provider:
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background: {C.PRI_GHO}; color: {C.PRI};
+                        border: none; border-bottom: 2px solid {C.PRI};
+                        border-radius: 3px; padding: 0 8px;
+                    }}
+                """)
+            else:
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background: transparent; color: {C.WHITE_DIM};
+                        border: 1px solid {C.BORDER}44; border-radius: 3px; padding: 0 8px;
+                    }}
+                    QPushButton:hover {{ color: {C.PRI}; background: {C.PRI_GHO};
+                                         border: 1px solid {C.BORDER_B}; }}
+                """)
+
+    def _highlight_ai_fallback(self):
+        for key, btn in self._ai_fb_btns.items():
+            if key == getattr(self, "_ai_fallback", "ask"):
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background: {C.PRI_GHO}; color: {C.PRI};
+                        border: none; border-bottom: 2px solid {C.PRI};
+                        border-radius: 3px; padding: 0 8px;
+                    }}
+                """)
+            else:
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background: transparent; color: {C.WHITE_DIM};
+                        border: 1px solid {C.BORDER}44; border-radius: 3px; padding: 0 8px;
+                    }}
+                    QPushButton:hover {{ color: {C.PRI}; background: {C.PRI_GHO};
+                                         border: 1px solid {C.BORDER_B}; }}
+                """)
+
+    def _select_ai_provider(self, key: str):
+        self._ai_provider = key
+        self._highlight_ai_provider()
+        # Population finishes with a save of the preserved-or-first model.
+        self._refresh_ai_models()
+
+    def _refresh_ai_models(self, preselect: str = ""):
+        provider = self._ai_provider
+        self._ai_model_combo.setEnabled(False)
+        self._ai_status.setText("Detecting models…")
+        if preselect:
+            self._ai_preselect = preselect
+
+        def _fetch():
+            try:
+                from core.models import catalog
+                infos = catalog(provider)
+                items = [i.to_dict() for i in infos]
+            except Exception:
+                items = []
+            self.ai_models_finished.emit(items)
+
+        threading.Thread(target=_fetch, daemon=True).start()
+
+    def _on_ai_models(self, items: list):
+        self._ai_models = items or []
+        combo = self._ai_model_combo
+        self._ai_loading = True
+        combo.blockSignals(True)
+        combo.clear()
+        for info in self._ai_models:
+            label = info.get("label") or info.get("id", "")
+            meta = []
+            if info.get("params_b"):
+                meta.append(f'{info["params_b"]:g}B')
+            if info.get("free") is True:
+                meta.append("free")
+            elif info.get("free") is False:
+                meta.append("paid")
+            if meta:
+                label = f'{label} [{", ".join(meta)}]'
+            combo.addItem(label, info.get("id", ""))
+        wanted = getattr(self, "_ai_preselect", "")
+        self._ai_preselect = ""
+        if not wanted:
+            try:
+                from core.models import get_selection
+                sel = get_selection()
+                if sel.get("provider") == self._ai_provider:
+                    wanted = sel.get("model", "")
+            except Exception:
+                pass
+        idx = combo.findData(wanted) if wanted else -1
+        if idx < 0:
+            for i, info in enumerate(self._ai_models):
+                if info.get("available"):
+                    idx = i
+                    break
+        if idx < 0 and combo.count():
+            idx = 0
+        if idx >= 0:
+            combo.setCurrentIndex(idx)
+        combo.blockSignals(False)
+        combo.setEnabled(True)
+        self._ai_loading = False
+        self._on_ai_model_changed(combo.currentIndex() if combo.count() else -1)
+
+    def _on_ai_model_changed(self, idx: int):
+        model_id = ""
+        typed = self._ai_model_combo.currentText().strip()
+        if 0 <= idx < len(self._ai_models) and self._ai_model_combo.itemText(idx) == typed:
+            model_id = self._ai_models[idx].get("id", "")
+        if not model_id:
+            model_id = typed
+        hint = model_id
+        for info in self._ai_models:
+            if info.get("id") == model_id:
+                parts = ["local" if info.get("local") else "cloud"]
+                caps = info.get("capabilities", [])
+                for cap, tag in (("tool_calling", "tools"), ("vision", "vision"),
+                                 ("audio_input", "voice"), ("live_voice", "voice")):
+                    if cap in caps and tag not in parts:
+                        parts.append(tag)
+                hint = f'{info.get("label", model_id)} · {", ".join(parts)}'
+                if info.get("warning"):
+                    hint += f' — {info["warning"]}'
+                break
+        self._ai_model_hint.setText(hint)
+        self._save_ai_state(model_id)
+
+    def _select_ai_fallback(self, key: str):
+        self._ai_fallback = key
+        self._highlight_ai_fallback()
+        self._save_ai_state()
+
+    def _save_ai_state(self, model_id: str = ""):
+        if not getattr(self, "_ai_provider", ""):
+            return
+        if getattr(self, "_ai_loading", False):
+            return
+        if not model_id:
+            model_id = self._ai_model_combo.currentText().strip()
+        if not model_id:
+            return
+        try:
+            from core.models import set_selection
+            saved = set_selection(self._ai_provider, model_id,
+                                  fallback=getattr(self, "_ai_fallback", "ask"))
+            try:
+                self._ai_status.setText(
+                    f'Active: {saved["provider"]} / {saved["model"]}')
+            except Exception:
+                pass
+            self.model_changed.emit(saved["provider"], saved["model"])
+        except Exception as e:
+            try:
+                self._ai_status.setText(f"Could not save: {e}")
+            except Exception:
+                pass
 
     def _highlight_graphics(self, quality: str):
         value = _normalize_graphics_quality(quality)
@@ -6644,13 +7075,8 @@ class MainWindow(QMainWindow):
         # Get current name
         current_name = ""
         try:
-            from memory.memory_manager import load_memory
-            memory = load_memory()
-            name_entry = memory.get("identity", {}).get("name")
-            if isinstance(name_entry, dict):
-                current_name = name_entry.get("value", "")
-            elif isinstance(name_entry, str):
-                current_name = name_entry
+            from core.profile import get_display_name
+            current_name = get_display_name()
         except Exception:
             pass
 
@@ -6670,6 +7096,7 @@ class MainWindow(QMainWindow):
         ov.name_changed.connect(self._on_settings_name)
         ov.theme_changed.connect(self._on_settings_theme)
         ov.graphics_changed.connect(self._on_settings_graphics)
+        ov.model_changed.connect(self._on_settings_model)
         ov.show()
         self._settings_overlay = ov
 
@@ -6682,6 +7109,18 @@ class MainWindow(QMainWindow):
 
     def _on_settings_graphics(self, quality: str):
         self._apply_graphics_quality_live(quality)
+
+    def _on_settings_model(self, provider: str, model: str):
+        """Apply a provider/model switch: engine only, identity preserved."""
+        try:
+            prev = (os.environ.get("MITSU_PROVIDER", ""), getattr(self, "_active_model", ""))
+            os.environ["MITSU_PROVIDER"] = provider
+            self._active_model = model
+            if (provider, model) != prev:
+                self._log.append_log(f"SYS: AI engine switched — {provider} / {model}.")
+                self._log.append_log("SYS: Identity, memory, and tasks preserved.")
+        except Exception:
+            pass
 
     def _show_vision_preview(self, source: str):
         if self._vision_preview is None:
@@ -8337,7 +8776,7 @@ class MainWindow(QMainWindow):
     def _show_setup(self, initial_provider: str | None = None):
         ov = SetupOverlay(self.centralWidget(), initial_provider=initial_provider)
         cw = self.centralWidget()
-        ow, oh = 460, 420
+        ow, oh = 460, 560
         ov.setGeometry(
             (cw.width()  - ow) // 2,
             (cw.height() - oh) // 2,
@@ -8347,8 +8786,24 @@ class MainWindow(QMainWindow):
         ov.show()
         self._overlay = ov
 
+    def _persist_model_selection(self, provider: str, model: str):
+        """Persist the user's provider+model choice (never touches identity)."""
+        try:
+            from core.models import set_selection, default_model
+            model = (model or "").strip() or default_model(provider)
+            saved = set_selection(provider, model)
+            self._log.append_log(f"SYS: AI model: {saved['model']}")
+        except Exception as e:
+            self._log.append_log(f"SYS: Could not save model selection: {e}")
+
     def _on_setup_done(self, key: str, os_name: str, remember_key: bool):
         provider = getattr(self._overlay, "_selected_provider", "ollama") if self._overlay else "ollama"
+        model = ""
+        if self._overlay is not None:
+            try:
+                model = self._overlay._selected_model_id()
+            except Exception:
+                model = ""
 
         # For Ollama — no key needed
         if provider == "ollama":
@@ -8361,6 +8816,7 @@ class MainWindow(QMainWindow):
             cfg["os_system"] = os_name
             cfg["provider"] = "ollama"
             API_FILE.write_text(json.dumps(cfg, indent=4), encoding="utf-8")
+            self._persist_model_selection(provider, model)
             self._ready = True
             if self._overlay:
                 self._overlay.hide()
@@ -8399,6 +8855,7 @@ class MainWindow(QMainWindow):
             cfg["os_system"] = os_name
             cfg["provider"] = "openrouter"
             API_FILE.write_text(json.dumps(cfg, indent=4), encoding="utf-8")
+            self._persist_model_selection(provider, model)
             self._ready = True
             if self._overlay:
                 self._overlay.hide()
@@ -8443,6 +8900,7 @@ class MainWindow(QMainWindow):
         cfg["os_system"] = os_name
         cfg["provider"] = "gemini"
         API_FILE.write_text(json.dumps(cfg, indent=4), encoding="utf-8")
+        self._persist_model_selection(provider, model)
         try:
             if isinstance(key, str) and key.strip():
                 os.environ["GEMINI_API_KEY"] = key.strip()
@@ -8465,17 +8923,10 @@ class MainWindow(QMainWindow):
         self._show_voice_select_then_name()
 
     def _check_and_show_name_signin(self):
-        """Show the name sign-in overlay only if no name is saved in memory."""
+        """Show the name sign-in overlay only if no identity is stored."""
         try:
-            from memory.memory_manager import load_memory
-            memory = load_memory()
-            name_entry = memory.get("identity", {}).get("name")
-            name = None
-            if isinstance(name_entry, dict):
-                name = name_entry.get("value")
-            elif isinstance(name_entry, str):
-                name = name_entry
-            if name and name.strip():
+            from core.profile import get_display_name
+            if get_display_name():
                 # Name already known — no need to ask
                 return
         except Exception:
@@ -8528,13 +8979,8 @@ class MainWindow(QMainWindow):
         # Pre-fill with existing name if one is saved
         existing_name = ""
         try:
-            from memory.memory_manager import load_memory
-            memory = load_memory()
-            name_entry = memory.get("identity", {}).get("name")
-            if isinstance(name_entry, dict):
-                existing_name = name_entry.get("value", "")
-            elif isinstance(name_entry, str):
-                existing_name = name_entry
+            from core.profile import get_display_name
+            existing_name = get_display_name()
         except Exception:
             pass
 
@@ -8569,25 +9015,18 @@ class MainWindow(QMainWindow):
             self._name_overlay.deleteLater()
             self._name_overlay = None
         if not name or not name.strip():
-            # X button was pressed — don't overwrite saved name
+            # X button was pressed — guest mode, don't overwrite saved name
             return
         save_name = name.strip()
-        if save_name.lower() in ("sir", "madam", "madame"):
-            # Never persist generic honorifics as the real name
-            self._log.append_log("SYS: Please enter a real name so MITSU can address you.")
-            return
         try:
-            from memory.memory_manager import update_memory
-            update_memory({"identity": {"name": {"value": save_name}}})
-            # Keep CLI username store in sync
-            try:
-                uf = Path.home() / ".mitsu" / "username.txt"
-                uf.parent.mkdir(parents=True, exist_ok=True)
-                uf.write_text(save_name, encoding="utf-8")
-            except Exception:
-                pass
+            from core.profile import set_display_name
+            save_name = set_display_name(save_name)
             self._log.append_log(f"SYS: Identity set — {save_name}.")
             self._log.append_log(f"MITSU: Good to know you, {save_name}. What should we do first?")
+        except ValueError as e:
+            # Empty or generic honorific — never persist as the real name
+            self._log.append_log(f"SYS: {e}")
+            return
         except Exception as e:
             self._log.append_log(f"SYS: Could not save name: {e}")
         # Notify MitsuLive so it can update the running session immediately
@@ -8604,14 +9043,8 @@ class MainWindow(QMainWindow):
         if not hasattr(self, "_name_btn"):
             return
         try:
-            from memory.memory_manager import load_memory
-            memory = load_memory()
-            name_entry = memory.get("identity", {}).get("name")
-            name = None
-            if isinstance(name_entry, dict):
-                name = name_entry.get("value")
-            elif isinstance(name_entry, str):
-                name = name_entry
+            from core.profile import get_display_name
+            name = get_display_name() or None
             if name and name.strip() and name.strip().lower() not in ("sir", "madam"):
                 display_name = name.strip()
                 if len(display_name) > 14:
@@ -8884,9 +9317,18 @@ class MitsuUI:
         self._win._log_sig.emit(text)
         self._win._parse_log_for_context(text)
 
-    def wait_for_api_key(self):
+    def wait_for_setup(self):
+        """Block until first-run setup completes (any provider).
+
+        Historically named wait_for_api_key; renamed because local and
+        OpenRouter modes never require a Gemini key.
+        """
         while not self._win._ready:
             time.sleep(0.1)
+
+    def wait_for_api_key(self):
+        """Deprecated alias of wait_for_setup (kept for compatibility)."""
+        return self.wait_for_setup()
 
     def start_speaking(self):
         self.set_state("SPEAKING")

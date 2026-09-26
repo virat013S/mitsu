@@ -22,7 +22,10 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-import httpx
+try:
+    import httpx
+except ImportError:  # optional at import time; checked by skill_availability
+    httpx = None
 
 
 # ── Calculator ──────────────────────────────────────────────────────────────
@@ -53,6 +56,8 @@ def skill_calculator(expression: str) -> str:
 
 def skill_web_fetch(url: str, max_chars: int = 5000) -> str:
     """Fetch content from a URL and return readable text."""
+    if httpx is None:
+        return "Fetch unavailable: install httpx to enable web_fetch."
     try:
         resp = httpx.get(url, timeout=15.0, follow_redirects=True, headers={
             "User-Agent": "Mozilla/5.0 (compatible; Mitsu/1.0)"
@@ -254,6 +259,84 @@ def get_skill_descriptions() -> str:
         params = ", ".join(skill["params"].keys())
         lines.append(f"  - {name}({params}): {skill['description']}")
     return "\n".join(lines)
+
+
+# ── Skill metadata & availability ──────────────────────────────────────────
+# Every skill declares its category, risk, reversibility, and platform
+# requirements so the UI can show AVAILABLE / REQUIRES_DEPENDENCY /
+# UNAVAILABLE instead of a dead button.
+
+CATEGORY_UTILITY = "utility"
+CATEGORY_WEB = "web"
+CATEGORY_FILES = "files"
+CATEGORY_MEDIA = "media"
+CATEGORY_AUDIO = "audio"
+
+RISK_LOW = "low"        # read-only, no side effects
+RISK_MEDIUM = "medium"  # local execution with side effects
+
+AVAILABLE = "available"
+REQUIRES_DEPENDENCY = "requires_dependency"
+UNAVAILABLE = "unavailable"
+
+SKILL_METADATA = {
+    "calculator": {"category": CATEGORY_UTILITY, "risk": RISK_LOW,
+                   "reversible": True, "requires": []},
+    "web_fetch": {"category": CATEGORY_WEB, "risk": RISK_LOW,
+                  "reversible": True, "requires": ["httpx"]},
+    "run_code": {"category": CATEGORY_UTILITY, "risk": RISK_MEDIUM,
+                 "reversible": False, "requires": []},
+    "read_file": {"category": CATEGORY_FILES, "risk": RISK_LOW,
+                  "reversible": True, "requires": []},
+    "web_search": {"category": CATEGORY_WEB, "risk": RISK_LOW,
+                   "reversible": True,
+                   "requires_any": ["ddgs", "duckduckgo_search"]},
+    "datetime": {"category": CATEGORY_UTILITY, "risk": RISK_LOW,
+                 "reversible": True, "requires": []},
+    "json_parse": {"category": CATEGORY_UTILITY, "risk": RISK_LOW,
+                   "reversible": True, "requires": []},
+    "analyze_image": {"category": CATEGORY_MEDIA, "risk": RISK_LOW,
+                      "reversible": True, "requires": ["numpy", "cv2"]},
+    "ocr_image": {"category": CATEGORY_MEDIA, "risk": RISK_LOW,
+                  "reversible": True, "requires": ["PIL", "pytesseract"]},
+    "analyze_video": {"category": CATEGORY_MEDIA, "risk": RISK_LOW,
+                      "reversible": True, "requires": ["numpy", "cv2"]},
+    "identify_speaker": {"category": CATEGORY_AUDIO, "risk": RISK_LOW,
+                         "reversible": True,
+                         "requires": ["numpy", "soundfile"]},
+}
+
+
+def get_skill_metadata(name: str) -> dict | None:
+    """Return the metadata record for a skill, or None if unknown."""
+    meta = SKILL_METADATA.get(name)
+    return dict(meta) if meta else None
+
+
+def skill_availability(name: str) -> dict:
+    """Availability state plus a human-readable reason.
+
+    Returns {"state": AVAILABLE|REQUIRES_DEPENDENCY|UNAVAILABLE,
+             "reason": str, "missing": [deps]}.
+    """
+    import importlib.util
+
+    meta = SKILL_METADATA.get(name)
+    if meta is None:
+        return {"state": UNAVAILABLE, "reason": f"Unknown skill: {name}",
+                "missing": []}
+    missing = [dep for dep in meta.get("requires", [])
+               if importlib.util.find_spec(dep) is None]
+    if not missing and meta.get("requires_any"):
+        candidates = meta["requires_any"]
+        if not any(importlib.util.find_spec(dep) is not None
+                   for dep in candidates):
+            missing = [f"any of: {', '.join(candidates)}"]
+    if missing:
+        return {"state": REQUIRES_DEPENDENCY,
+                "reason": f"{name} needs: {', '.join(missing)}",
+                "missing": missing}
+    return {"state": AVAILABLE, "reason": f"{name} is ready", "missing": []}
 
 
 def run_skill(name: str, **kwargs) -> str:

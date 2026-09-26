@@ -49,6 +49,12 @@ def _get_os() -> str:
 def _get_api_key() -> str:
     return _load_config().get("gemini_api_key", "")
 
+
+def _selected_gemini_model() -> str:
+    """User-selected Gemini model (never a hard-coded id)."""
+    from core.models import gemini_text_model
+    return gemini_text_model()
+
 _SAFE_SCREENSHOT_ROOTS = (
     Path.home(),
 )
@@ -312,7 +318,7 @@ def _screen_find(description: str) -> tuple[int, int] | None:
         )
 
         response = client.models.generate_content(
-            model="gemini-2.5-flash-lite",
+            model=_selected_gemini_model(),
             contents=[
                 gtypes.Part.from_bytes(data=image_bytes, mime_type="image/png"),
                 prompt,

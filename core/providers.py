@@ -202,11 +202,21 @@ def speak(text: str, voice: str | None = None) -> bool:
 
 def call_ollama(
     messages: list[dict],
-    model: str = "gemma3:1b",
+    model: str | None = None,
     tools: list[dict] | None = None,
     stream: bool = False,
 ) -> dict:
-    """Call Ollama chat API with optional tool support."""
+    """Call Ollama chat API with optional tool support.
+
+    The model defaults to the user's selected Ollama model
+    (MITSU_MODEL env > stored selection > provider default).
+    """
+    if not (model or "").strip():
+        try:
+            from core.models import resolve_model
+            model = resolve_model("ollama")
+        except Exception:
+            model = PROVIDERS["ollama"]["model"]
     base_url = PROVIDERS["ollama"]["base_url"]
     payload: dict[str, Any] = {
         "model": model,
@@ -225,10 +235,21 @@ def call_openrouter(
     model: str | None = None,
     tools: list[dict] | None = None,
 ) -> dict:
-    """Call OpenRouter API (OpenAI-compatible)."""
+    """Call OpenRouter API (OpenAI-compatible).
+
+    The model defaults to the user's selected OpenRouter model
+    (explicit > MITSU_MODEL env > stored selection > OPENROUTER_MODEL
+    env > provider default).
+    """
     key = os.environ.get("OPENROUTER_API_KEY", "")
     base_url = PROVIDERS["openrouter"]["base_url"]
-    if model is None:
+    if not (model or "").strip():
+        try:
+            from core.models import resolve_model
+            model = resolve_model("openrouter")
+        except Exception:
+            model = None
+    if not (model or "").strip():
         model = os.environ.get("OPENROUTER_MODEL", PROVIDERS["openrouter"]["model"])
     headers = {
         "Authorization": f"Bearer {key}",
@@ -253,8 +274,13 @@ def chat_with_provider(
     messages: list[dict],
     provider: str | None = None,
     voice: bool = False,
+    model: str | None = None,
 ) -> str:
-    """Unified chat interface. Send messages, get response, optionally speak it."""
+    """Unified chat interface. Send messages, get response, optionally speak it.
+
+    The model defaults to the user's selection for the active provider;
+    an explicit model always wins (never silently overridden).
+    """
     provider = provider or get_provider()
 
     if provider == "gemini":
@@ -262,7 +288,7 @@ def chat_with_provider(
         return ""
 
     if provider == "ollama":
-        result = call_ollama(messages)
+        result = call_ollama(messages, model=model)
         text = result.get("message", {}).get("content", "")
         # Execute any skill calls in the response
         text, skill_results = execute_skill_calls(text)
@@ -271,7 +297,7 @@ def chat_with_provider(
         return text
 
     if provider == "openrouter":
-        result = call_openrouter(messages)
+        result = call_openrouter(messages, model=model)
         text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
         text, skill_results = execute_skill_calls(text)
         if voice and text:
@@ -279,3 +305,67 @@ def chat_with_provider(
         return text
 
     return "Unknown provider"
+
+
+def provider_requires_key(provider: str | None = None) -> str | None:
+    """Return the env var a provider needs, or None if it needs no key.
+
+    Local/Ollama never requires any API key. OpenRouter requires only its
+    own key. Only Gemini requires a Gemini key — and only when selected.
+    """
+    provider = (provider or get_provider() or "").strip().lower()
+    if provider == "gemini":
+        return "GEMINI_API_KEY"
+    if provider == "openrouter":
+        return "OPENROUTER_API_KEY"
+    return None
+
+
+def missing_credential_message(provider: str | None = None) -> str:
+    """User-facing message for a provider that cannot authenticate.
+
+    Never mentions Gemini unless Gemini is the selected provider.
+    """
+    provider = (provider or get_provider() or "").strip().lower()
+    if provider == "gemini":
+        return (
+            "Gemini is not configured. Set GEMINI_API_KEY, then select "
+            "the Gemini provider again."
+        )
+    if provider == "openrouter":
+        return (
+            "OpenRouter credentials are missing. Set OPENROUTER_API_KEY "
+            "to use the OpenRouter provider. No Gemini key is needed."
+        )
+    return (
+        "Local AI is unavailable. Start or verify Ollama "
+        "(ollama serve), or change provider. No API key is needed "
+        "for local mode."
+    )
+
+
+def translate_tool_error(tool_name: str, error: Exception,
+                         provider: str | None = None) -> str:
+    """Convert a raw tool exception into a WHAT/WHY/WHAT-TO-DO message.
+
+    Gemini-backed tools raise 'Gemini API key not found' when no key is
+    configured. Surface that as a configuration error tied to the active
+    provider instead of a raw traceback-style message.
+    """
+    raw = f"{error}".strip() or error.__class__.__name__
+    lowered = raw.lower()
+    if "gemini api key" in lowered or "gemini_api_key" in lowered.replace(" ", "_"):
+        active = (provider or get_provider() or "").strip().lower()
+        if active and active != "gemini":
+            return (
+                f"Tool '{tool_name}' needs Gemini credentials, but the "
+                f"active provider is {active}. Configure a Gemini key in "
+                f"Settings, or use a provider-native alternative. "
+                f"Your provider has not been changed."
+            )
+        return (
+            f"Tool '{tool_name}' needs Gemini credentials. "
+            "Gemini is not configured — add a Gemini key in Settings "
+            "to enable it."
+        )
+    return f"Tool '{tool_name}' failed: {raw}"

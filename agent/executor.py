@@ -2,6 +2,7 @@ import json
 import re
 import sys
 import threading
+import time
 import subprocess
 import tempfile
 import os
@@ -428,11 +429,20 @@ class AgentExecutor:
             except Exception as e:
                 print(f"[Awareness] ⚠️ clear_active_tool failed: {e}")
 
+    @staticmethod
+    def _wait_if_paused(cancel_flag: threading.Event | None,
+                        pause_flag: threading.Event | None) -> None:
+        """Block between steps while paused; abort early if cancelled."""
+        while (pause_flag is not None and pause_flag.is_set()
+               and not (cancel_flag is not None and cancel_flag.is_set())):
+            time.sleep(0.2)
+
     def execute(
         self,
         goal:        str,
         speak:       Callable | None        = None,
         cancel_flag: threading.Event | None = None,
+        pause_flag:  threading.Event | None = None,
     ) -> str:
         print(f"\n[Executor] 🎯 Goal: {goal}")
         self._awareness_goal(goal)
@@ -459,6 +469,7 @@ class AgentExecutor:
                 if cancel_flag and cancel_flag.is_set():
                     if speak: speak("Task cancelled.")
                     return "Task cancelled."
+                self._wait_if_paused(cancel_flag, pause_flag)
 
                 step_num = step.get("step", "?")
                 tool     = step.get("tool", "generated_code")
@@ -473,6 +484,9 @@ class AgentExecutor:
                 step_ok = False
 
                 while attempt <= 3:
+                    if cancel_flag and cancel_flag.is_set():
+                        break
+                    self._wait_if_paused(cancel_flag, pause_flag)
                     if cancel_flag and cancel_flag.is_set():
                         break
                     try:

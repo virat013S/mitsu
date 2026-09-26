@@ -47,9 +47,15 @@ def _gemini_client():
     return genai.Client(api_key=_get_api_key())
 
 
-def _generate_content(contents, model: str = "gemini-2.5-flash") -> str:
+def _selected_gemini_model(explicit: str | None = None) -> str:
+    """User-selected Gemini model (never a hard-coded id)."""
+    from core.models import gemini_text_model
+    return gemini_text_model(explicit)
+
+
+def _generate_content(contents, model: str | None = None) -> str:
     response = _gemini_client().models.generate_content(
-        model=model,
+        model=_selected_gemini_model(model),
         contents=contents,
     )
     return (response.text or "").strip()
@@ -206,7 +212,7 @@ def _process_image(path: Path, action: str, params: dict, speak=None) -> str:
                 prompt = params["instruction"]
 
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=_selected_gemini_model(),
                 contents=[prompt, img]
             )
             result   = response.text.strip()
@@ -320,7 +326,7 @@ def _process_pdf(path: Path, action: str, params: dict, speak=None) -> str:
         try:
             client    = _gemini_client()
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=_selected_gemini_model(),
                 contents=[prompt_map.get(action, f"Analyze:\n\n{text}")]
             )
             result   = response.text.strip()
@@ -414,7 +420,7 @@ def _process_text_doc(path: Path, file_type: str, action: str,
     try:
         client    = _gemini_client()
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=_selected_gemini_model(),
             contents=[prompt_map[action]]
         )
         result   = response.text.strip()

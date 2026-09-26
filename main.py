@@ -80,7 +80,6 @@ BASE_DIR        = get_base_dir()
 _load_dotenv()
 API_CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
 PROMPT_PATH     = BASE_DIR / "core" / "prompt.txt"
-LIVE_MODEL = "models/gemini-2.5-flash-native-audio-preview-12-2025"
 CHANNELS            = 1
 SEND_SAMPLE_RATE    = 16000
 SUPPORTED_VOICE_NAMES = {
@@ -345,47 +344,21 @@ def _load_voice_name() -> str:
 
 
 def _current_user_name() -> str:
-    """Resolve the user's real name: memory first, then CLI username file."""
-    # Memory (UI identity store)
+    """Resolve the user's real name via the canonical profile service."""
     try:
-        from memory.memory_manager import load_memory
-        entry = load_memory().get("identity", {}).get("name")
-        val = entry.get("value") if isinstance(entry, dict) else entry
-        if isinstance(val, str) and val.strip() and val.strip().lower() not in ("sir", "madam", "madame", "friend"):
-            return val.strip()
+        from core.profile import get_display_name
+        return get_display_name()
     except Exception:
-        pass
-    # CLI username file
-    try:
-        if USERNAME_FILE.exists():
-            name = USERNAME_FILE.read_text(encoding="utf-8").strip()
-            if name and name.lower() not in ("sir", "madam", "madame", "friend"):
-                return name
-    except Exception:
-        pass
-    return ""
+        return ""
 
 
 def _sync_username_stores() -> str:
     """Ensure username.txt and memory identity agree. Returns the resolved name."""
-    name = _current_user_name()
-    if not name:
+    try:
+        from core.profile import sync_stores
+        return sync_stores()
+    except Exception:
         return ""
-    try:
-        USERNAME_FILE.parent.mkdir(parents=True, exist_ok=True)
-        if not USERNAME_FILE.exists() or USERNAME_FILE.read_text(encoding="utf-8").strip() != name:
-            USERNAME_FILE.write_text(name, encoding="utf-8")
-    except Exception:
-        pass
-    try:
-        from memory.memory_manager import load_memory, update_memory
-        entry = load_memory().get("identity", {}).get("name")
-        mem_name = entry.get("value") if isinstance(entry, dict) else entry
-        if (mem_name or "").strip() != name:
-            update_memory({"identity": {"name": {"value": name}}})
-    except Exception:
-        pass
-    return name
 
 
 def _load_system_prompt() -> str:
@@ -1563,15 +1536,7 @@ class MitsuLive:
 
     async def _announce_startup(self):
         try:
-            memory = load_memory()
-            name_entry = memory.get("identity", {}).get("name")
-            name = None
-            if isinstance(name_entry, dict):
-                name = name_entry.get("value")
-            elif isinstance(name_entry, str):
-                name = name_entry
-            if not name:
-                name = _current_user_name()
+            name = _current_user_name()
             if name:
                 greeting = f"Mitsu. Good to see you again, {name}. What would you like to accomplish today?"
             else:
@@ -1877,7 +1842,11 @@ class MitsuLive:
                 result = f"Unknown tool: {name}"
 
         except Exception as e:
-            result = f"Tool '{name}' failed: {e}"
+            try:
+                from core.providers import translate_tool_error
+                result = translate_tool_error(name, e, self._current_provider())
+            except Exception:
+                result = f"Tool '{name}' failed: {e}"
             traceback.print_exc()
             self.speak_error(name, e)
 
@@ -2250,20 +2219,18 @@ PROVIDER_CONFIG = Path.home() / ".mitsu" / "provider.json"
 
 
 def _load_username() -> str | None:
-    """Load saved username, or return None if first time."""
+    """Load saved username, or return None if first time (guest)."""
     try:
-        if USERNAME_FILE.exists():
-            name = USERNAME_FILE.read_text().strip()
-            return name if name else None
+        from core.profile import get_display_name
+        return get_display_name() or None
     except Exception:
-        pass
-    return None
+        return None
 
 
 def _save_username(name: str) -> None:
-    """Save username to disk."""
-    USERNAME_FILE.parent.mkdir(parents=True, exist_ok=True)
-    USERNAME_FILE.write_text(name.strip())
+    """Save username via the canonical profile service."""
+    from core.profile import set_display_name
+    set_display_name(name)
 
 
 def _load_provider_config() -> dict:
@@ -2277,9 +2244,91 @@ def _load_provider_config() -> dict:
 
 
 def _save_provider_config(config: dict) -> None:
-    """Save provider config to disk."""
+    """Merge provider config to disk (never wipes the stored model)."""
     PROVIDER_CONFIG.parent.mkdir(parents=True, exist_ok=True)
-    PROVIDER_CONFIG.write_text(json.dumps(config, indent=2))
+    try:
+        existing = json.loads(PROVIDER_CONFIG.read_text()) if PROVIDER_CONFIG.exists() else {}
+        if not isinstance(existing, dict):
+            existing = {}
+    except Exception:
+        existing = {}
+    existing.update(config or {})
+    PROVIDER_CONFIG.write_text(json.dumps(existing, indent=2))
+
+
+def _setup_model_cli(provider: str, api_key: str = "") -> bool:
+    """First-run model picker: discover, choose, test, save.
+
+    Only ever asks for the active provider's configuration. The choice
+    persists via core.models (provider.json) without touching identity.
+    """
+    from core.models import (catalog, check_model, default_model,
+                             explicit_selection, set_selection)
+    try:
+        models = catalog(provider, api_key=api_key)
+    except Exception as exc:
+        print(f"  Model discovery failed ({exc}); using default.")
+        models = []
+    sel = explicit_selection()
+    current = sel["model"] if sel and sel["provider"] == provider else ""
+    if not models:
+        chosen = current or default_model(provider)
+        set_selection(provider, chosen)
+        print(f"  Model: {chosen}")
+        return True
+
+    shown = models[:20]
+    print(f"\n  Available {provider} models:")
+    for i, info in enumerate(shown, 1):
+        tags = []
+        if info.params_b:
+            tags.append(f"{info.params_b:g}B")
+        if info.free is True:
+            tags.append("free")
+        elif info.free is False:
+            tags.append("paid")
+        if info.local:
+            tags.append("local")
+        mark = "  (current)" if current and current == info.id else ""
+        warn = f"  — {info.warning}" if info.warning else ""
+        tag_str = f" [{', '.join(tags)}]" if tags else ""
+        print(f"    [{i}] {info.label}{tag_str}{mark}{warn}")
+    try:
+        raw = input(
+            f"  Choose model [1-{len(shown)}] (Enter keeps current): "
+        ).strip()
+    except (EOFError, KeyboardInterrupt):
+        raw = ""
+    chosen = ""
+    if not raw:
+        if current:
+            chosen = current
+        else:
+            first_available = next((m.id for m in shown if m.available), "")
+            chosen = first_available or default_model(provider)
+    elif raw.isdigit() and 1 <= int(raw) <= len(shown):
+        chosen = shown[int(raw) - 1].id
+    else:
+        chosen = raw  # custom model id
+    set_selection(provider, chosen)
+    print(f"  Model: {chosen}")
+    if provider == "ollama":
+        from core.providers import ensure_ollama_model
+        print(f"  Ensuring '{chosen}' is downloaded...")
+        if ensure_ollama_model(chosen):
+            print(f"  ✅ {chosen} ready!")
+        else:
+            print(f"  ❌ Could not pull {chosen}. Run manually: ollama pull {chosen}")
+            return False
+    else:
+        check = check_model(provider, chosen)
+        if not check.get("available"):
+            print(f"  ⚠️ {check.get('error')}")
+        elif check.get("warning"):
+            print(f"  ⚠️ {check['warning']}")
+        else:
+            print("  ✅ Model check passed.")
+    return True
 
 
 def _startup_banner() -> None:
@@ -2314,7 +2363,7 @@ def _select_provider() -> str:
 
 def _setup_provider(provider: str) -> bool:
     """Configure the selected provider. Returns True if ready."""
-    from core.providers import check_provider_status, ensure_ollama_model, PROVIDERS
+    from core.providers import check_provider_status
 
     env_path = BASE_DIR / ".env"
 
@@ -2349,7 +2398,8 @@ def _setup_provider(provider: str) -> bool:
             os.environ["GEMINI_API_KEY"] = key
             print("  ✅ API key saved!")
         _save_provider_config({"provider": "gemini"})
-        return True
+        return _setup_model_cli(
+            "gemini", api_key=key or os.environ.get("GEMINI_API_KEY", ""))
 
     if provider == "ollama":
         status = check_provider_status("ollama")
@@ -2358,17 +2408,8 @@ def _setup_provider(provider: str) -> bool:
             print("  Install: curl -fsSL https://ollama.com/install.sh | sh")
             print("  Then start: ollama serve\n")
             return False
-        if not status.get("model_ready"):
-            model = PROVIDERS["ollama"]["model"]
-            print(f"\n  Model {model} not found. Downloading... (this may take a moment)")
-            if ensure_ollama_model(model):
-                print(f"  ✅ {model} ready!")
-            else:
-                print(f"  ❌ Failed to download {model}")
-                print(f"  Run manually: ollama pull {model}")
-                return False
         _save_provider_config({"provider": "ollama"})
-        return True
+        return _setup_model_cli("ollama")
 
     if provider == "openrouter":
         key = os.environ.get("OPENROUTER_API_KEY", "")
@@ -2391,7 +2432,8 @@ def _setup_provider(provider: str) -> bool:
             os.environ["OPENROUTER_API_KEY"] = key
             print("  ✅ API key saved!")
         _save_provider_config({"provider": "openrouter"})
-        return True
+        return _setup_model_cli(
+            "openrouter", api_key=key or os.environ.get("OPENROUTER_API_KEY", ""))
 
     return False
 
@@ -2425,6 +2467,14 @@ def main():
     if "--self-test" in sys.argv[1:]:
         from scripts.self_test import main as self_test_main
         return self_test_main([a for a in sys.argv[1:] if a != "--self-test"])
+
+    if "--doctor" in sys.argv[1:]:
+        from scripts.doctor import main as doctor_main
+        return doctor_main([a for a in sys.argv[1:] if a != "--doctor"])
+
+    if "--version" in sys.argv[1:]:
+        print("Mitsu 0.1.0")
+        return 0
 
     from ui import MitsuUI
 
@@ -2476,7 +2526,7 @@ def main():
         return
 
     def runner():
-        ui.wait_for_api_key()
+        ui.wait_for_setup()
         voice_name = _load_voice_name()
         mitsu = MitsuLive(ui, voice_name)
         ui.on_quit_requested = mitsu.request_shutdown
@@ -2501,9 +2551,9 @@ def main():
         def _on_name_changed(new_name: str):
             try:
                 _save_username(new_name)
-                from memory.memory_manager import update_memory
-                update_memory({"identity": {"name": {"value": new_name}}})
                 mitsu.ui.write_log(f"SYS: Identity updated — {new_name}.")
+            except ValueError as e:
+                mitsu.ui.write_log(f"SYS: {e}")
             except Exception as e:
                 mitsu.ui.write_log(f"ERR: Could not persist name: {e}")
         ui.on_name_change = _on_name_changed

@@ -13,6 +13,12 @@ from pathlib import Path
 from typing import Any, Callable
 
 
+def _selected_gemini_model() -> str:
+    """User-selected Gemini model (never a hard-coded id)."""
+    from core.models import gemini_text_model
+    return gemini_text_model()
+
+
 def verify_pptx(path: Path, expected_slides: int | None = None) -> dict[str, Any]:
     if not path.exists() or path.stat().st_size == 0:
         raise RuntimeError("The generated PowerPoint is missing or empty.")
@@ -216,7 +222,7 @@ def critique_renders(
             if path:
                 contents.append(types.Part.from_bytes(data=Path(path).read_bytes(), mime_type="image/png"))
         response = client.models.generate_content(
-            model=os.environ.get("PRESENTATION_QA_MODEL", "gemini-2.5-flash"),
+            model=os.environ.get("PRESENTATION_QA_MODEL", "").strip() or _selected_gemini_model(),
             contents=contents,
             config={"response_mime_type": "application/json"},
         )
