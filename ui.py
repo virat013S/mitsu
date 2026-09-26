@@ -216,50 +216,50 @@ class QFont(_QFont):
 
 
 class C:
-    # ── Backgrounds ──────────────────────────────────────────────────────────
-    BG        = "#000000"   # pure black
-    PANEL     = "#0A0A0A"   # near-black
-    PANEL2    = "#111111"   # soft black
-    DARK      = "#050505"   # deep black
-    DARK2     = "#1A1A1A"   # elevated black
-    BAR_BG    = "#0D0D0D"   # bar background
-    CARD      = "#141414"   # card surface
-    CARD_B    = "#1E1E1E"   # card elevated
-    HOLOGRAM  = "#ffffff06"  # glass panel fill
-    # ── Borders ──────────────────────────────────────────────────────────────
-    BORDER    = "#2A2A2A"   # subtle gray
-    BORDER_B  = "#444444"   # visible gray
-    BORDER_A  = "#333333"   # medium gray
-    STEEL     = "#1F1F1F"   # structural borders
-    # ── Primary — white energy ───────────────────────────────────────────────
-    PRI       = "#FFFFFF"   # pure white (primary)
-    PRI_DIM   = "#666666"   # muted white
-    PRI_GHO   = "#1A1A1A"   # ghost
-    PRI_GLOW  = "#ffffff14"  # subtle glow
-    ENERGY    = "#F0F0F0"   # bright white
-    ENERGY_D  = "#AAAAAA"   # dim white
+    # ── Backgrounds — cool graphite (blue-tinted noir) ───────────────────────
+    BG        = "#05070C"   # blue-black
+    PANEL     = "#090C13"   # near-black
+    PANEL2    = "#0E121A"   # soft black
+    DARK      = "#020307"   # deep black
+    DARK2     = "#141926"   # elevated black
+    BAR_BG    = "#0A0E16"   # bar background
+    CARD      = "#10141D"   # card surface
+    CARD_B    = "#171D2A"   # card elevated
+    HOLOGRAM  = "#9FD0FF0A"  # ice glass panel fill
+    # ── Borders — cool steel ─────────────────────────────────────────────────
+    BORDER    = "#1D2432"   # subtle cool
+    BORDER_B  = "#39435A"   # visible cool
+    BORDER_A  = "#293145"   # medium cool
+    STEEL     = "#131826"   # structural borders
+    # ── Primary — ice-white energy ───────────────────────────────────────────
+    PRI       = "#EAF2FF"   # ice white (primary)
+    PRI_DIM   = "#5A6880"   # muted ice
+    PRI_GHO   = "#131A28"   # ghost
+    PRI_GLOW  = "#7DD3FC1F"  # ice glow
+    ENERGY    = "#8FD3FF"   # ice-blue energy
+    ENERGY_D  = "#4E86AD"   # dim ice
     # ── Accents ──────────────────────────────────────────────────────────────
-    ACC       = "#E0E0E0"   # silver
-    ACC2      = "#CCCCCC"   # lighter silver
-    AMBER     = "#FFFFFF"   # white warning (bold style)
-    AMBER_D   = "#888888"   # dim white
-    PURPLE    = "#BBBBBB"   # soft gray
-    PURPLE_D  = "#555555"   # dim gray
-    GREEN     = "#00FF88"   # keep green for success
-    GREEN_D   = "#00AA55"
-    GREEN_GLO = "#00FF8810"
-    RED       = "#FF2244"   # keep red for errors
-    RED_D     = "#AA1133"
-    RED_BG    = "#1A0810"
-    GREEN_BG  = "#001A0D"
-    PURPLE_BG = "#0D0D0D"
-    MUTED_C   = "#888888"
+    ACC       = "#6EC1FF"   # ice blue
+    ACC2      = "#A5DCFF"   # lighter ice
+    AMBER     = "#F5C77E"   # warm sand (warning)
+    AMBER_D   = "#9A8355"   # dim sand
+    PURPLE    = "#9A8CFF"   # periwinkle (research)
+    PURPLE_D  = "#5B57B8"   # dim periwinkle
+    GREEN     = "#31E08A"   # keep green for success
+    GREEN_D   = "#0B9E5C"
+    GREEN_GLO = "#31E08A14"
+    RED       = "#FF4D6D"   # keep red for errors
+    RED_D     = "#B32741"
+    RED_BG    = "#1A0A11"
+    GREEN_BG  = "#06160F"
+    PURPLE_BG = "#0B0D18"
+    MUTED_C   = "#7C879B"
     # ── Typography ───────────────────────────────────────────────────────────
-    TEXT      = "#FFFFFF"   # white text
-    TEXT_DIM  = "#555555"   # muted
-    TEXT_MED  = "#999999"   # medium gray
-    WHITE     = "#FFFFFF"   # white
-    WHITE_DIM = "#777777"   # dim white
+    TEXT      = "#E9EEF8"   # cool off-white text
+    TEXT_DIM  = "#566076"   # muted
+    TEXT_MED  = "#8C97AC"   # medium cool gray
+    WHITE     = "#F4F7FD"   # near-white
+    WHITE_DIM = "#78869C"   # dim cool white
 
 
 
@@ -287,30 +287,30 @@ class ThemeManager:
     _THEMES = {
         "mitsu_noir": {
             "name": "Mitsu Noir",
-            "BG": "#000000",
-            "PANEL": "#0A0A0A",
-            "PANEL2": "#111111",
-            "DARK": "#050505",
-            "DARK2": "#1A1A1A",
-            "BAR_BG": "#0D0D0D",
-            "CARD": "#141414",
-            "CARD_B": "#1E1E1E",
-            "BORDER": "#2A2A2A",
-            "BORDER_B": "#444444",
-            "BORDER_A": "#333333",
-            "STEEL": "#1F1F1F",
-            "WHITE": "#FFFFFF",
-            "WHITE_DIM": "#777777",
-            "PRI": "#FFFFFF", "PRI_DIM": "#666666", "PRI_GHO": "#1A1A1A",
-            "PRI_GLOW": "#ffffff14", "ENERGY": "#F0F0F0", "ENERGY_D": "#AAAAAA",
-            "ACC": "#E0E0E0", "ACC2": "#CCCCCC", "PURPLE": "#BBBBBB",
-            "GREEN": "#00FF88", "RED": "#FF2244", "TEXT": "#FFFFFF",
-            "TEXT_DIM": "#555555", "TEXT_MED": "#999999",
-            "RED_BG": "#1A0810", "GREEN_BG": "#001A0D", "PURPLE_BG": "#0D0D0D",
-            "MUTED_C": "#888888",
-            "HOLOGRAM": "#ffffff06", "AMBER": "#FFFFFF", "AMBER_D": "#888888",
-            "PURPLE_D": "#555555", "GREEN_D": "#00AA55", "GREEN_GLO": "#00FF8810",
-            "RED_D": "#AA1133",
+            "BG": "#05070C",
+            "PANEL": "#090C13",
+            "PANEL2": "#0E121A",
+            "DARK": "#020307",
+            "DARK2": "#141926",
+            "BAR_BG": "#0A0E16",
+            "CARD": "#10141D",
+            "CARD_B": "#171D2A",
+            "BORDER": "#1D2432",
+            "BORDER_B": "#39435A",
+            "BORDER_A": "#293145",
+            "STEEL": "#131826",
+            "WHITE": "#F4F7FD",
+            "WHITE_DIM": "#78869C",
+            "PRI": "#EAF2FF", "PRI_DIM": "#5A6880", "PRI_GHO": "#131A28",
+            "PRI_GLOW": "#7DD3FC1F", "ENERGY": "#8FD3FF", "ENERGY_D": "#4E86AD",
+            "ACC": "#6EC1FF", "ACC2": "#A5DCFF", "PURPLE": "#9A8CFF",
+            "GREEN": "#31E08A", "RED": "#FF4D6D", "TEXT": "#E9EEF8",
+            "TEXT_DIM": "#566076", "TEXT_MED": "#8C97AC",
+            "RED_BG": "#1A0A11", "GREEN_BG": "#06160F", "PURPLE_BG": "#0B0D18",
+            "MUTED_C": "#7C879B",
+            "HOLOGRAM": "#9FD0FF0A", "AMBER": "#F5C77E", "AMBER_D": "#9A8355",
+            "PURPLE_D": "#5B57B8", "GREEN_D": "#0B9E5C", "GREEN_GLO": "#31E08A14",
+            "RED_D": "#B32741",
         },
         "arc_reactor": {
             "name": "Deep Ocean",
@@ -2774,14 +2774,14 @@ class AgentGridWidget(QWidget):
 
     # ── Per-agent accent (monochrome luminance ladder) ─────────────────────
     _ACCENT = {
-        "CORE":       "#FFFFFF",
-        "RESEARCH":   "#E0E0E0",
-        "SECURITY":   "#CCCCCC",
-        "AUTOMATION": "#AAAAAA",
-        "MEMORY":     "#BBBBBB",
-        "VISION":     "#999999",
-        "DEV":        "#E0E0E0",
-        "SYSTEM":     "#777777",
+        "CORE":       "#F2F6FF",
+        "RESEARCH":   "#DCE4F2",
+        "SECURITY":   "#C6D0E2",
+        "AUTOMATION": "#AEB9CC",
+        "MEMORY":     "#C0CADB",
+        "VISION":     "#97A3B8",
+        "DEV":        "#E6ECF7",
+        "SYSTEM":     "#7A8698",
     }
 
     _STATUS = {
@@ -3913,12 +3913,12 @@ class LogWidget(QTextEdit):
             QTimer.singleShot(20, self._next)
 
 _FILE_ICONS = {
-    "image":   ("🖼", "#F0F0F0"), "video":   ("🎬", "#CCCCCC"),
-    "audio":   ("🎵", "#E0E0E0"), "pdf":     ("📄", "#AAAAAA"),
-    "word":    ("📝", "#DDDDDD"), "excel":   ("📊", "#BBBBBB"),
-    "code":    ("💻", "#FFFFFF"), "archive": ("📦", "#999999"),
-    "pptx":    ("📊", "#AAAAAA"), "text":    ("📃", "#AAAAAA"),
-    "data":    ("🔧", "#CCCCCC"), "unknown": ("📎", "#888888"),
+    "image":   ("🖼", "#F2F6FF"), "video": ("🎬", "#C6D0E2"),
+    "audio":   ("🎵", "#DCE4F2"), "pdf":     ("📄", "#AEB9CC"),
+    "word":    ("📝", "#E0E8F5"), "excel": ("📊", "#C0CADB"),
+    "code":    ("💻", "#F2F6FF"), "archive": ("📦", "#97A3B8"),
+    "pptx":    ("📊", "#AEB9CC"), "text":    ("📃", "#AEB9CC"),
+    "data":    ("🔧", "#C6D0E2"), "unknown": ("📎", "#7C879B"),
 }
 _EXT_TO_CAT = {
     **dict.fromkeys(["jpg","jpeg","png","gif","webp","bmp","tiff","svg","ico"], "image"),
