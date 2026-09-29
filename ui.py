@@ -268,6 +268,20 @@ def qcol(h: str, a: int = 255) -> QColor:
     c = QColor(h); c.setAlpha(a); return c
 
 
+def qss_rgba(hex_color: str, alpha: int) -> str:
+    """Stylesheet-safe color: Qt QSS needs explicit rgba(), NOT #RRGGBBAA.
+
+    Qt parses 8-digit hex as #AARRGGBB, so suffix-alpha strings like
+    "#8FD3FF55" render as the wrong hue (olive/green). Always build
+    translucent QSS colors through this helper.
+    """
+    h = hex_color.lstrip("#")
+    if len(h) == 3:
+        h = "".join(ch * 2 for ch in h)
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r}, {g}, {b}, {int(alpha) & 0xFF})"
+
+
 # ---------------------------------------------------------------------------
 # ThemeManager — dynamic color theming with presets
 # ---------------------------------------------------------------------------
@@ -542,7 +556,7 @@ class ChatBubbleWidget(QWidget):
             QLineEdit {{
                 background: {C.DARK};
                 color: {C.WHITE};
-                border: 1px solid {C.ENERGY}55;
+                border: 1px solid {qss_rgba(C.ENERGY, 0x55)};
                 border-radius: 4px;
                 padding: 4px 10px;
             }}
@@ -564,13 +578,13 @@ class ChatBubbleWidget(QWidget):
         send_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         send_btn.setStyleSheet(f"""
             QPushButton {{
-                background: {C.ENERGY}22;
+                background: {qss_rgba(C.ENERGY, 0x22)};
                 color: {C.ENERGY};
-                border: 1px solid {C.ENERGY}66;
+                border: 1px solid {qss_rgba(C.ENERGY, 0x66)};
                 border-radius: 4px;
             }}
             QPushButton:hover {{
-                background: {C.ENERGY}44;
+                background: {qss_rgba(C.ENERGY, 0x44)};
                 border: 1px solid {C.ENERGY};
                 color: {C.WHITE};
             }}
@@ -645,7 +659,7 @@ class ChatBubbleWidget(QWidget):
         lbl = QLabel(partial + '▌')
         lbl.setFont(QFont(UI_FONT, 9))
         lbl.setWordWrap(True)
-        lbl.setStyleSheet(f'color: {C.PRI}; background: {C.PRI_GHO}; border: 1px solid {C.PRI}44; border-radius: 6px; padding: 6px 10px;')
+        lbl.setStyleSheet(f'color: {C.PRI}; background: {C.PRI_GHO}; border: 1px solid {qss_rgba(C.PRI, 0x44)}; border-radius: 6px; padding: 6px 10px;')
         self._c_lay.addWidget(lbl)
         self._typing_bubble = lbl
         sb = self._scroll.verticalScrollBar()
@@ -722,6 +736,37 @@ class ChatBubbleWidget(QWidget):
             name = "SYS"
 
         ts = time.strftime("%H:%M")
+
+        # System rows are quiet log lines — no card chrome, so real
+        # conversation (user / MITSU) owns the visual hierarchy.
+        if sender == "sys":
+            row = QWidget()
+            row.setStyleSheet("background: transparent;")
+            r_lay = QHBoxLayout(row)
+            r_lay.setContentsMargins(2, 1, 2, 1)
+            r_lay.setSpacing(6)
+            dot = QLabel("·")
+            dot.setFont(QFont(UI_FONT, 9))
+            dot.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent; border: none;")
+            r_lay.addWidget(dot)
+            msg = QLabel(display.strip())
+            msg.setFont(QFont(UI_FONT, 8))
+            msg.setWordWrap(True)
+            msg.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent; border: none;")
+            r_lay.addWidget(msg, stretch=1)
+            ts_lbl = QLabel(ts)
+            ts_lbl.setFont(QFont(UI_FONT, 7))
+            ts_lbl.setStyleSheet(f"color: {C.BORDER_B}; background: transparent; border: none;")
+            r_lay.addWidget(ts_lbl)
+            self._c_lay.insertWidget(self._c_lay.count() - 1, row)
+            self._messages.append({"sender": sender, "text": display, "ts": ts})
+            if len(self._messages) > 200:
+                self._messages.pop(0)
+                item = self._c_lay.takeAt(0)
+                if item and item.widget():
+                    item.widget().deleteLater()
+            QTimer.singleShot(50, self._scroll_bottom)
+            return
 
         # Build bubble widget
         bubble = QWidget()
@@ -1123,7 +1168,7 @@ class ToastNotification(QWidget):
         colors = {
             "info":    (C.PRI,    C.PRI_GHO),
             "success": (C.GREEN,  C.GREEN_BG),
-            "warning": (C.ACC,    C.ACC2),
+            "warning": (C.AMBER,  C.DARK2),
             "error":   (C.RED,    C.RED_BG),
         }
         fg, bg = colors.get(toast_type, colors["info"])
@@ -1131,7 +1176,7 @@ class ToastNotification(QWidget):
         self.setStyleSheet(f"""
             ToastNotification {{
                 background: {bg};
-                border: 1px solid {fg}88;
+                border: 1px solid {qss_rgba(fg, 0x88)};
                 border-radius: 6px;
             }}
         """)
@@ -1233,8 +1278,8 @@ class ToolProgressWidget(QWidget):
         self.setFixedHeight(28)
         self.setStyleSheet(f"""
             QWidget {{
-                background: {C.PURPLE}18;
-                border: 1px solid {C.PURPLE}44;
+                background: {qss_rgba(C.PURPLE, 0x18)};
+                border: 1px solid {qss_rgba(C.PURPLE, 0x44)};
                 border-radius: 4px;
             }}
         """)
@@ -1390,6 +1435,13 @@ class CompactModeWidget(QWidget):
         r = min(W, H) / 2.0 - 4
         is_active = self._is_active()
 
+        # Vignette — darken corners so the web reads with depth.
+        vig = QRadialGradient(QPointF(cx, cy), max(W, H) * 0.72)
+        vig.setColorAt(0.0, QColor(0, 0, 0, 0))
+        vig.setColorAt(0.62, QColor(0, 0, 0, 0))
+        vig.setColorAt(1.0, qcol(C.DARK, 150))
+        p.fillRect(self.rect(), vig)
+
         # Soft backdrop
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QBrush(qcol(C.DARK, 220)))
@@ -1409,7 +1461,7 @@ class CompactModeWidget(QWidget):
                 if dist > r * 0.72:
                     continue
                 mid = (self._nodes[i][3] + self._nodes[j][3]) * 0.5
-                a = int(70 * mid * (1.3 if is_active else 1.0))
+                a = int((30 + 90 * mid * mid) * (1.3 if is_active else 1.0))
                 a = max(0, min(180, a))
                 if a < 6:
                     continue
@@ -1435,7 +1487,8 @@ class CompactModeWidget(QWidget):
         for k, nd in enumerate(self._nodes):
             x, y = pts[k]
             breath = 0.65 + 0.35 * math.sin(nd[4])
-            a = int(255 * nd[3] * breath * (0.75 if is_active else 0.55))
+            hub_boost = 1.25 if nd[5] < 0 else 1.0
+            a = int(255 * nd[3] * breath * (0.75 if is_active else 0.55) * hub_boost)
             a = max(0, min(255, a))
             rad = nd[2] * (1.2 if is_active else 1.0)
             p.setPen(Qt.PenStyle.NoPen)
@@ -1601,19 +1654,19 @@ class BasePopup(QWidget):
         
         # Styling based on popup type
         bg_colors = {
-            PopupType.MICRO: f"{C.PRI_GHO}cc",
-            PopupType.INFORMATION: f"{C.BORDER}aa",
-            PopupType.ACTION: f"{C.ACC}15",
-            PopupType.RESEARCH: f"{C.PURPLE}15",
-            PopupType.CRITICAL: f"{C.RED}20",
+            PopupType.MICRO: f"{qss_rgba(C.PRI_GHO, 0xcc)}",
+            PopupType.INFORMATION: f"{qss_rgba(C.BORDER, 0xaa)}",
+            PopupType.ACTION: f"{qss_rgba(C.ACC, 0x15)}",
+            PopupType.RESEARCH: f"{qss_rgba(C.PURPLE, 0x15)}",
+            PopupType.CRITICAL: f"{qss_rgba(C.RED, 0x20)}",
         }
         
         border_colors = {
-            PopupType.MICRO: f"{C.PRI}44",
-            PopupType.INFORMATION: f"{C.BORDER}88",
-            PopupType.ACTION: f"{C.ACC}88",
-            PopupType.RESEARCH: f"{C.PURPLE}88",
-            PopupType.CRITICAL: f"{C.RED}cc",
+            PopupType.MICRO: f"{qss_rgba(C.PRI, 0x44)}",
+            PopupType.INFORMATION: f"{qss_rgba(C.BORDER, 0x88)}",
+            PopupType.ACTION: f"{qss_rgba(C.ACC, 0x88)}",
+            PopupType.RESEARCH: f"{qss_rgba(C.PURPLE, 0x88)}",
+            PopupType.CRITICAL: f"{qss_rgba(C.RED, 0xcc)}",
         }
         
         text_colors = {
@@ -1624,8 +1677,8 @@ class BasePopup(QWidget):
             PopupType.CRITICAL: C.RED,
         }
         
-        bg = bg_colors.get(popup_type, f"{C.PRI_GHO}cc")
-        border = border_colors.get(popup_type, f"{C.PRI}44")
+        bg = bg_colors.get(popup_type, f"{qss_rgba(C.PRI_GHO, 0xcc)}")
+        border = border_colors.get(popup_type, f"{qss_rgba(C.PRI, 0x44)}")
         text_color = text_colors.get(popup_type, C.WHITE)
         
         self.setStyleSheet(f"""
@@ -4181,7 +4234,7 @@ class SetupOverlay(QWidget):
             return w
 
         layout.addWidget(_lbl("◈  INITIALISATION REQUIRED", 13, True))
-        layout.addWidget(_lbl("Configure MITSU. before first boot.", 9, color=C.PRI_DIM))
+        layout.addWidget(_lbl("Configure MITSU before first boot.", 9, color=C.PRI_DIM))
         layout.addSpacing(6)
 
         sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
@@ -4195,9 +4248,9 @@ class SetupOverlay(QWidget):
         prov_row = QHBoxLayout(); prov_row.setSpacing(6)
         self._prov_btns: dict[str, QPushButton] = {}
         for key, label in [
-            ("gemini",     "☁  Cloud (Gemini)"),
-            ("ollama",     "⚡ Local (Ollama)"),
-            ("openrouter", "🌐 OpenRouter"),
+            ("gemini",     "CLOUD · Gemini"),
+            ("ollama",     "LOCAL · Ollama"),
+            ("openrouter", "OPENROUTER"),
         ]:
             btn = QPushButton(label)
             btn.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
@@ -4444,7 +4497,7 @@ class SetupOverlay(QWidget):
             if info.get("warning"):
                 meta.append("!")
             if meta:
-                label = f'{label} [{", ".join(meta)}]'
+                label = f'{label} [{", ".join(m for m in meta if m)}]'
             self._model_combo.addItem(label, info.get("id", ""))
         # Pre-select: stored choice for this provider, else first available.
         try:
@@ -4853,7 +4906,7 @@ class GraphicsQualityCard(QPushButton):
                     );
                     border: 1px solid {C.PRI}; border-radius: 6px;
                 }}
-                QPushButton:hover {{ background: {C.PRI_GLOW}; }}
+                QPushButton:hover {{ background: {qss_rgba(C.PRI, 0x14)}; }}
             """)
             self._title.setStyleSheet(f"color: {C.WHITE}; background: transparent; border: none;")
             self._fps.setStyleSheet(f"color: {C.PRI}; background: transparent; border: none;")
@@ -4993,7 +5046,7 @@ class SettingsOverlay(_OverlayBase):
                 letter-spacing: 1px;
             }}
             QPushButton:hover {{
-                background: {C.PRI}22;
+                background: {qss_rgba(C.PRI, 0x22)};
                 border: 1px solid {C.PRI};
                 color: {C.ENERGY};
             }}
@@ -5078,8 +5131,8 @@ class SettingsOverlay(_OverlayBase):
         ai_prov_row.setSpacing(8)
         self._ai_prov_btns: dict[str, QPushButton] = {}
         for prov_key, prov_label in [
-            ("ollama", "⚡ Local"), ("openrouter", "🌐 OpenRouter"),
-            ("gemini", "☁ Gemini"),
+            ("ollama", "LOCAL"), ("openrouter", "OPENROUTER"),
+            ("gemini", "GEMINI"),
         ]:
             btn = QPushButton(prov_label)
             btn.setFont(QFont(UI_FONT, 8, QFont.Weight.Medium))
@@ -5179,7 +5232,7 @@ class SettingsOverlay(_OverlayBase):
                 btn.setStyleSheet(f"""
                     QPushButton {{
                         background: transparent; color: {C.WHITE_DIM};
-                        border: 1px solid {C.BORDER}44; border-radius: 3px; padding: 0 8px;
+                        border: 1px solid {qss_rgba(C.BORDER, 0x44)}; border-radius: 3px; padding: 0 8px;
                     }}
                     QPushButton:hover {{ color: {C.PRI}; background: {C.PRI_GHO};
                                          border: 1px solid {C.BORDER_B}; }}
@@ -5224,7 +5277,7 @@ class SettingsOverlay(_OverlayBase):
                 btn.setStyleSheet(f"""
                     QPushButton {{
                         background: transparent; color: {C.WHITE_DIM};
-                        border: 1px solid {C.BORDER}44; border-radius: 3px; padding: 0 8px;
+                        border: 1px solid {qss_rgba(C.BORDER, 0x44)}; border-radius: 3px; padding: 0 8px;
                     }}
                     QPushButton:hover {{ color: {C.PRI}; background: {C.PRI_GHO};
                                          border: 1px solid {C.BORDER_B}; }}
@@ -5244,7 +5297,7 @@ class SettingsOverlay(_OverlayBase):
                 btn.setStyleSheet(f"""
                     QPushButton {{
                         background: transparent; color: {C.WHITE_DIM};
-                        border: 1px solid {C.BORDER}44; border-radius: 3px; padding: 0 8px;
+                        border: 1px solid {qss_rgba(C.BORDER, 0x44)}; border-radius: 3px; padding: 0 8px;
                     }}
                     QPushButton:hover {{ color: {C.PRI}; background: {C.PRI_GHO};
                                          border: 1px solid {C.BORDER_B}; }}
@@ -5290,7 +5343,7 @@ class SettingsOverlay(_OverlayBase):
             elif info.get("free") is False:
                 meta.append("paid")
             if meta:
-                label = f'{label} [{", ".join(meta)}]'
+                label = f'{label} [{", ".join(m for m in meta if m)}]'
             combo.addItem(label, info.get("id", ""))
         wanted = getattr(self, "_ai_preselect", "")
         self._ai_preselect = ""
@@ -5886,7 +5939,7 @@ class VoiceSelectorOverlay(_OverlayBase):
                 letter-spacing: 1px;
             }}
             QPushButton:hover {{
-                background: {C.PRI}22;
+                background: {qss_rgba(C.PRI, 0x22)};
                 border: 1px solid {C.PRI};
                 color: {C.ENERGY};
             }}
@@ -5951,7 +6004,7 @@ class VoiceSelectorOverlay(_OverlayBase):
                 btn.setStyleSheet(f"""
                     QPushButton {{
                         background: {C.DARK}; color: {C.TEXT_MED};
-                        border: 1px solid {C.BORDER}55; border-radius: 4px;
+                        border: 1px solid {qss_rgba(C.BORDER, 0x55)}; border-radius: 4px;
                         border-top: 1px solid {C.BORDER};
                     }}
                     QPushButton:hover {{ color: {C.PRI}; border: 1px solid {C.BORDER_B};
@@ -7967,6 +8020,20 @@ class MainWindow(QMainWindow):
         prov_row.addWidget(self._status_provider_lbl)
         st.addLayout(prov_row)
 
+        model_row = QHBoxLayout(); model_row.setSpacing(4)
+        model_k = QLabel("MODEL")
+        model_k.setFont(QFont("Courier New", 6))
+        model_k.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
+        model_row.addWidget(model_k)
+        model_row.addStretch()
+        self._status_model_lbl = QLabel("")
+        self._status_model_lbl.setFont(QFont("Courier New", 7, QFont.Weight.Bold))
+        self._status_model_lbl.setStyleSheet(
+            f"color: {C.TEXT_MED}; background: transparent;"
+        )
+        model_row.addWidget(self._status_model_lbl)
+        st.addLayout(model_row)
+
         info_row = QHBoxLayout(); info_row.setSpacing(4)
         self._uptime_lbl = QLabel("UP --:--")
         self._uptime_lbl.setFont(QFont("Courier New", 6))
@@ -8144,6 +8211,16 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_status_provider_lbl"):
             try:
                 self._status_provider_lbl.setText(_load_provider_preference().upper())
+            except Exception:
+                pass
+        if hasattr(self, "_status_model_lbl"):
+            try:
+                from core.models import get_selection
+                model = get_selection()["model"]
+                short = model.split("/")[-1]
+                if len(short) > 20:
+                    short = short[:19] + "…"
+                self._status_model_lbl.setText(short.upper())
             except Exception:
                 pass
         if hasattr(self, "_rail_status_dot_lbl") and hasattr(self, "hud"):
