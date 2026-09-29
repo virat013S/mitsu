@@ -164,7 +164,11 @@ def execute_skill_calls(text: str) -> tuple[str, list[dict]]:
 # ── Voice / TTS ─────────────────────────────────────────────────────────────
 
 def _tts_edge(text: str, voice: str = "en-US-AriaNeural") -> bool:
-    """Generate speech using edge-tts (free, no API key). Returns True if played."""
+    """Generate speech using edge-tts (free, no API key). Returns True if played.
+
+    Plays through the user's selected speaker; falls back to mpv when
+    device-aware playback is unavailable.
+    """
     try:
         import subprocess, tempfile, os
         tmp = tempfile.mktemp(suffix=".mp3")
@@ -172,10 +176,18 @@ def _tts_edge(text: str, voice: str = "en-US-AriaNeural") -> bool:
             ["edge-tts", "--voice", voice, "--text", text, "--write-media", tmp],
             capture_output=True, timeout=30,
         )
-        if proc.returncode == 0 and os.path.exists(tmp):
-            subprocess.run(["mpv", "--no-video", tmp], capture_output=True, timeout=60)
-            os.unlink(tmp)
-            return True
+        if proc.returncode != 0 or not os.path.exists(tmp):
+            return False
+        try:
+            from core.audio import play_file
+            if play_file(tmp).get("ok"):
+                os.unlink(tmp)
+                return True
+        except Exception:
+            pass
+        subprocess.run(["mpv", "--no-video", tmp], capture_output=True, timeout=60)
+        os.unlink(tmp)
+        return True
     except Exception:
         pass
     return False

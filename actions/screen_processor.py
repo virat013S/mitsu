@@ -449,11 +449,17 @@ class _VisionSession:
                 raise
 
     async def _play_loop(self) -> None:
+        try:
+            from core.audio import selected_output
+            out_device = selected_output()
+        except Exception:
+            out_device = None
         stream = sd.RawOutputStream(
             samplerate=_RECEIVE_SAMPLE_RATE,
             channels=_CHANNELS,
             dtype="int16",
             blocksize=_CHUNK_SIZE,
+            device=out_device,
         )
         stream.start()
         try:

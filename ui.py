@@ -4933,6 +4933,8 @@ class SettingsOverlay(_OverlayBase):
     graphics_changed = pyqtSignal(str)
     model_changed = pyqtSignal(str, str)  # ai provider, model id
     ai_models_finished = pyqtSignal(list)
+    audio_changed = pyqtSignal()
+    au_test_finished = pyqtSignal(str)
 
     def __init__(self, parent=None, current_name: str = "",
                  current_voice: str = "puck", current_theme: str = "mitsu_noir",
@@ -4983,7 +4985,7 @@ class SettingsOverlay(_OverlayBase):
         tb_lay.setSpacing(4)
 
         self._s_tabs: list[QPushButton] = []
-        self._s_tab_names = ["IDENTITY", "THEME", "GRAPHICS", "AI MODEL"]
+        self._s_tab_names = ["IDENTITY", "THEME", "GRAPHICS", "AI MODEL", "AUDIO"]
         self._s_active_tab = 0
 
         for i, name in enumerate(self._s_tab_names):
@@ -5211,6 +5213,87 @@ class SettingsOverlay(_OverlayBase):
         self.ai_models_finished.connect(self._on_ai_models)
         self._load_ai_state()
 
+        # Page 4: AUDIO. Microphone + speaker selection applies to every
+        # provider (Gemini Live, local TTS/STT, alerts). Text always works.
+        au_page = QWidget()
+        au_page.setStyleSheet("background: transparent;")
+        au_lay = QVBoxLayout(au_page)
+        au_lay.setContentsMargins(4, 8, 4, 4)
+        au_lay.setSpacing(8)
+        au_lay.addWidget(_lbl(
+            "MICROPHONE", 8, bold=True, color_role="WHITE_DIM",
+            align=Qt.AlignmentFlag.AlignLeft,
+        ))
+        self._au_mic_combo = QComboBox()
+        self._au_mic_combo.setFont(QFont(UI_FONT, 8))
+        self._au_mic_combo.setFixedHeight(28)
+        self._au_mic_combo.setStyleSheet(f"""
+            QComboBox {{
+                background: {C.DARK}; color: {C.WHITE};
+                border: 1px solid {C.BORDER_B}; border-radius: 4px;
+                padding: 2px 8px;
+            }}
+        """)
+        self._au_mic_combo.currentIndexChanged.connect(self._on_audio_device_changed)
+        au_lay.addWidget(self._au_mic_combo)
+
+        au_lay.addWidget(_lbl(
+            "SPEAKER", 8, bold=True, color_role="WHITE_DIM",
+            align=Qt.AlignmentFlag.AlignLeft,
+        ))
+        self._au_spk_combo = QComboBox()
+        self._au_spk_combo.setFont(QFont(UI_FONT, 8))
+        self._au_spk_combo.setFixedHeight(28)
+        self._au_spk_combo.setStyleSheet(f"""
+            QComboBox {{
+                background: {C.DARK}; color: {C.WHITE};
+                border: 1px solid {C.BORDER_B}; border-radius: 4px;
+                padding: 2px 8px;
+            }}
+        """)
+        self._au_spk_combo.currentIndexChanged.connect(self._on_audio_device_changed)
+        au_lay.addWidget(self._au_spk_combo)
+
+        self._au_stt_lbl = QLabel("")
+        self._au_stt_lbl.setFont(QFont(UI_FONT, 8))
+        self._au_stt_lbl.setWordWrap(True)
+        self._au_stt_lbl.setStyleSheet(
+            f"color: {C.TEXT_MED}; background: transparent;")
+        au_lay.addWidget(self._au_stt_lbl)
+
+        au_test_row = QHBoxLayout()
+        au_test_row.setSpacing(8)
+        self._au_test_spk = QPushButton("Test speaker")
+        self._au_test_mic = QPushButton("Test mic")
+        for btn, slot in ((self._au_test_spk, self._test_speaker),
+                          (self._au_test_mic, self._test_mic)):
+            btn.setFont(QFont(UI_FONT, 8, QFont.Weight.Medium))
+            btn.setFixedHeight(28)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: transparent; color: {C.WHITE_DIM};
+                    border: 1px solid {qss_rgba(C.BORDER, 0x44)}; border-radius: 3px; padding: 0 8px;
+                }}
+                QPushButton:hover {{ color: {C.PRI}; background: {C.PRI_GHO};
+                                     border: 1px solid {C.BORDER_B}; }}
+            """)
+            btn.clicked.connect(slot)
+            au_test_row.addWidget(btn, stretch=1)
+        au_lay.addLayout(au_test_row)
+
+        self._au_status = QLabel("")
+        self._au_status.setFont(QFont(UI_FONT, 8))
+        self._au_status.setStyleSheet(
+            f"color: {C.TEXT_MED}; background: transparent;")
+        au_lay.addWidget(self._au_status)
+        au_lay.addStretch()
+        self._s_stack.addWidget(au_page)
+        self._au_loading = True
+        self.au_test_finished.connect(self._au_status.setText)
+        self._load_audio_state()
+        self._au_loading = False
+
         self._switch_s_tab(0)
         self._highlight_theme(current_theme)
         self._highlight_graphics(self._current_graphics)
@@ -5422,6 +5505,80 @@ class SettingsOverlay(_OverlayBase):
                 self._ai_status.setText(f"Could not save: {e}")
             except Exception:
                 pass
+
+    # ── AUDIO tab ────────────────────────────────────────────────────
+    def _load_audio_state(self):
+        try:
+            from core.audio import describe, get_selection
+            info = describe()
+            sel = get_selection()
+        except Exception:
+            info = {"inputs": [], "outputs": [], "devices_error": "audio unavailable",
+                    "stt": "unavailable"}
+            sel = {"input": None, "output": None}
+        for combo, items, current in (
+            (self._au_mic_combo, info.get("inputs", []), sel.get("input")),
+            (self._au_spk_combo, info.get("outputs", []), sel.get("output")),
+        ):
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItem("System default", None)
+            for dev in items:
+                mark = " · default" if dev.get("default") else ""
+                combo.addItem(f'{dev.get("name", "?")}{mark}', dev.get("index"))
+            if current is not None:
+                idx = combo.findData(current)
+                combo.setCurrentIndex(idx if idx >= 0 else 0)
+            combo.blockSignals(False)
+        err = info.get("devices_error", "")
+        self._au_stt_lbl.setText(
+            (f"Devices: {err}" if err else "Voice input: " + info.get("stt", "")))
+
+    def _on_audio_device_changed(self, _idx: int):
+        if getattr(self, "_au_loading", False):
+            return
+        try:
+            from core.audio import set_selection
+            mic = self._au_mic_combo.currentData()
+            spk = self._au_spk_combo.currentData()
+            saved = set_selection(input=mic, output=spk)
+            self._au_status.setText(
+                f'Mic: {saved["input"] if saved["input"] is not None else "default"} · '
+                f'Speaker: {saved["output"] if saved["output"] is not None else "default"}')
+            self.audio_changed.emit()
+        except Exception as e:
+            self._au_status.setText(f"Could not save: {e}")
+
+    def _test_speaker(self):
+        self._au_status.setText("Playing test tone…")
+        def _play():
+            try:
+                import numpy as np
+                from core.audio import play_pcm
+                rate = 16000
+                t = np.arange(int(rate * 0.4)) / rate
+                tone = (0.4 * 32767 * np.sin(2 * np.pi * 440 * t)).astype(np.int16)
+                result = play_pcm(tone, samplerate=rate)
+                msg = "Test tone played." if result.get("ok") else result.get("error", "")
+            except Exception as e:
+                msg = f"Test failed: {e}"
+            self.au_test_finished.emit(msg)
+        threading.Thread(target=_play, daemon=True).start()
+
+    def _test_mic(self):
+        self._au_status.setText("Listening… speak now.")
+        def _listen():
+            try:
+                from core.audio import listen_once
+                result = listen_once(timeout=8.0, phrase_limit=6.0)
+                if result.get("ok"):
+                    msg = f'Heard: "{result["text"]}"'
+                else:
+                    msg = result.get("error", "listen failed")
+            except Exception as e:
+                msg = f"Test failed: {e}"
+            self.au_test_finished.emit(msg)
+        threading.Thread(target=_listen, daemon=True).start()
 
     def _highlight_graphics(self, quality: str):
         value = _normalize_graphics_quality(quality)

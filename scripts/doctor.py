@@ -130,6 +130,33 @@ def run_checks() -> list[dict]:
     except Exception as exc:
         checks.append(_check("memory", "FAIL", f"memory unreadable: {exc}"))
 
+    # Audio (mic/speaker/STT) — same for every provider
+    try:
+        from core.audio import describe, get_selection
+        info = describe()
+        if info.get("devices_error"):
+            checks.append(_check("audio", "SKIP", info["devices_error"],
+                                 "Text mode keeps working; check audio deps."))
+        else:
+            sel = get_selection()
+            checks.append(_check(
+                "audio", "PASS" if info["inputs"] and info["outputs"] else "SKIP",
+                f'{len(info["inputs"])} mic(s), {len(info["outputs"])} speaker(s); '
+                f'mic={sel["input"]}, speaker={sel["output"]}'))
+        checks.append(_check(
+            "audio:stt",
+            "PASS" if info.get("stt", "").startswith("available") else "SKIP",
+            info.get("stt", "")))
+        checks.append(_check(
+            "audio:ffmpeg",
+            "PASS" if info.get("ffmpeg") else "SKIP",
+            "ffmpeg present" if info.get("ffmpeg")
+            else "mp3 TTS needs ffmpeg or mpv"))
+    except ImportError as exc:
+        checks.append(_check("audio", "SKIP", f"audio modules unavailable: {exc}"))
+    except Exception as exc:
+        checks.append(_check("audio", "SKIP", f"audio probe failed: {exc}"))
+
     # Platform capabilities
     try:
         from core.platform import capability_summary

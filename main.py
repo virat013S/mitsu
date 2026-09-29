@@ -315,6 +315,17 @@ def _get_api_key() -> str:
     return api_key
 
 
+def _selected_audio_device(kind: str):
+    """User-selected mic/speaker index, or None for system default."""
+    try:
+        from core.audio import selected_input, selected_output
+        if kind == "input":
+            return selected_input()
+        return selected_output()
+    except Exception:
+        return None
+
+
 def _normalize_voice_name(voice_name: str | None) -> str:
     if not voice_name:
         return DEFAULT_VOICE_NAME
@@ -1902,6 +1913,7 @@ class MitsuLive:
                 dtype="int16",
                 blocksize=CHUNK_SIZE,
                 callback=callback,
+                device=_selected_audio_device("input"),
             ):
                 print("[MITSU] 🎤 Mic stream open")
                 while not self._shutdown_requested.is_set():
@@ -2016,6 +2028,7 @@ class MitsuLive:
                 channels=CHANNELS,
                 dtype="int16",
                 blocksize=CHUNK_SIZE,
+                device=_selected_audio_device("output"),
             )
             stream.start()
 

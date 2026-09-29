@@ -52,11 +52,16 @@ def _mp3_bytes_to_pcm(mp3_bytes: bytes) -> np.ndarray:
 
 def _play_pcm(pcm: np.ndarray, on_start: Callable | None = None,
               on_stop: Callable | None = None) -> None:
-    """Play int16 PCM array through sounddevice using RawOutputStream (blocking)."""
+    """Play int16 PCM array through the selected speaker (blocking)."""
     if pcm.size == 0:
         if on_stop:
             on_stop()
         return
+    try:
+        from core.audio import selected_output
+        out_device = selected_output()
+    except Exception:
+        out_device = None
     try:
         if on_start:
             on_start()
@@ -65,6 +70,7 @@ def _play_pcm(pcm: np.ndarray, on_start: Callable | None = None,
             samplerate=RECEIVE_SAMPLE_RATE,
             channels=1,
             dtype="int16",
+            device=out_device,
         )
         stream.start()
         chunk_size = 4096

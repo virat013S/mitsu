@@ -249,6 +249,12 @@ SKILLS = {
         "function": lambda audio_path: "",  # placeholder
         "params": {"audio_path": "str"},
     },
+    "voice_input": {
+        "name": "voice_input",
+        "description": "Listen to the microphone once and transcribe speech to text. Use when the user speaks instead of typing (any provider).",
+        "function": lambda timeout="8": "",
+        "params": {"timeout": "str (default 8 seconds)"},
+    },
 }
 
 
@@ -304,6 +310,9 @@ SKILL_METADATA = {
     "identify_speaker": {"category": CATEGORY_AUDIO, "risk": RISK_LOW,
                          "reversible": True,
                          "requires": ["numpy", "soundfile"]},
+    "voice_input": {"category": CATEGORY_AUDIO, "risk": RISK_LOW,
+                    "reversible": True,
+                    "requires": ["sounddevice", "speech_recognition"]},
 }
 
 
@@ -367,6 +376,16 @@ def run_skill(name: str, **kwargs) -> str:
                     audio_data = audio_data.mean(axis=1)
                 return identify_speaker(audio_data, sr)
             return "No valid audio file provided"
+        if name == "voice_input":
+            from core.audio import listen_once
+            try:
+                timeout = float(kwargs.get("timeout", 8) or 8)
+            except (TypeError, ValueError):
+                timeout = 8.0
+            result = listen_once(timeout=timeout)
+            if result.get("ok"):
+                return result["text"]
+            return f"Voice input unavailable: {result.get('error')}"
         return skill["function"](**kwargs)
     except TypeError as e:
         return f"Wrong arguments for {name}: {e}"
