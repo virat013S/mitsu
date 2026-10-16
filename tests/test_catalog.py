@@ -152,6 +152,7 @@ def test_probe_net_flap_keeps_visible(monkeypatch):
         async def chat(self, messages, model, **kw):
             raise RuntimeError("timeout: read timed out")
     monkeypatch.setattr(R, "get_provider", lambda name: P())
+    monkeypatch.setattr("mitsu.providers.secrets.load_key", lambda name: "sk-x")
     rows = _a.run(R.usable_providers())
     d = {x["name"]: x["usable"] for x in rows}
     assert d["openrouter"] is True  # unknown → don't hide a real provider

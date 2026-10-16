@@ -116,6 +116,7 @@ async def _probe_one(name: str, cfg: dict) -> bool | None:
     if kind == "ollama":
         return _ollama_healthy()
     import asyncio as _a
+    from .secrets import load_key  # call-time import → tests can patch secrets.load_key
     if kind == "custom" and not cfg.get("base_url"):
         return False  # custom endpoint with nowhere to talk
     from .base import ChatMessage
