@@ -109,7 +109,7 @@ def test_probe_hides_locked_and_keyless(monkeypatch):
         async def chat(self, messages, model, **kw):
             raise RuntimeError("zen: free-tier keys only work *inside OpenCode itself*")
     monkeypatch.setattr(R, "get_provider", lambda name: P())
-    monkeypatch.setattr(R, "load_key", lambda name: "")
+    monkeypatch.setattr("mitsu.providers.secrets.load_key", lambda name: "")
 
     rows = _a.run(R.usable_providers())
     d = {x["name"]: x["usable"] for x in rows}
@@ -129,7 +129,7 @@ def test_probe_rate_limited_counts_as_working(monkeypatch):
         async def chat(self, messages, model, **kw):
             raise RuntimeError("openrouter: rate-limited (free models throttle)")
     monkeypatch.setattr(R, "get_provider", lambda name: P())
-    monkeypatch.setattr(R, "load_key", lambda name: "sk-whatever")
+    monkeypatch.setattr("mitsu.providers.secrets.load_key", lambda name: "sk-whatever")
     rows = _a.run(R.usable_providers())
     d = {x["name"]: x["usable"] for x in rows}
     assert d["openrouter"] is True  # valid key, just busy

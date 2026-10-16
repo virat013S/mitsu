@@ -119,8 +119,6 @@ async def _probe_one(name: str, cfg: dict) -> bool | None:
     if kind == "custom" and not cfg.get("base_url"):
         return False  # custom endpoint with nowhere to talk
     from .base import ChatMessage
-    from .openai_compat import OpenAICompatProvider
-    from .secrets import load_key
     if kind not in ("zen", "go") and cfg.get("kind", name) != "custom" \
             and not load_key(name):
         return False  # nothing to talk through
