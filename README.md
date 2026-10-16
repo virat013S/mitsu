@@ -53,11 +53,10 @@ Type `mitsu` → window opens → ears open 👂 (says so) → talk or type.
 
 ## Run
 ```bash
-pip install -e .           # core
-python -m pip install -e ".[voice,native,tray,dev]"   # everything
-bash scripts/install.sh    # system deps + voices + INSTALL EVERYTHING
-mitsu doctor               # verify
-mitsu                      # dance
+git clone https://github.com/virat013S/mitsu && cd mitsu
+sh scripts/install.sh     # or: python3 scripts/install.py (any shell, even fish)
+mitsu doctor              # verify
+mitsu                     # dance
 ```
 
 ## Disclaimers (read once, keep forever)
