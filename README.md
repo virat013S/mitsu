@@ -54,10 +54,12 @@ Type `mitsu` → window opens → ears open 👂 (says so) → talk or type.
 ## Run
 ```bash
 git clone https://github.com/virat013S/mitsu && cd mitsu
-sh scripts/install.sh     # or: python3 scripts/install.py (any shell, even fish)
-mitsu doctor              # verify
-mitsu                     # dance
+./install          # any shell (bash/zsh/fish/POSIX); Windows: install.bat
+mitsu doctor       # verify
+mitsu              # dance
 ```
+
+(Longer forms work identically: `sh scripts/install.sh` or `python3 scripts/install.py`.)
 
 ## Disclaimers (read once, keep forever)
 - **Vision/screen features**: your message asking about the screen is the
