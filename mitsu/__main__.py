@@ -126,11 +126,32 @@ def main(argv: list[str] | None = None) -> None:
                                  r"Software\Microsoft\Windows\CurrentVersion\Run", 0,
                                  winreg.KEY_SET_VALUE)
             if getattr(sys, "frozen", False):
-                cmd = f'"{sys.argv[0]}"'
+                target = sys.argv[0]
+                launch = pathlib.Path(target).with_name("mitsu.bat")
+                launch.write_text(f'@echo off\r\nstart "" "{target}"\r\n')
+                local = pathlib.Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "WindowsApps"
+                try:
+                    local.mkdir(parents=True, exist_ok=True)
+                    shutil.copy(launch, local / "mitsu.bat")
+                except OSError:
+                    pass
+                # Start Menu shortcut
+                smenu = (pathlib.Path(os.environ.get("APPDATA", "")) / "Microsoft"
+                         / "Windows" / "Start Menu" / "Programs" / "Mitsu.lnk")
+                try:
+                    from subprocess import run as _run
+                    _run(["powershell", "-NoProfile", "-Command",
+                          f"$s=(New-Object -ComObject WScript.Shell);"
+                          f"$s.CreateShortcut('{smenu}').TargetPath='{target}';"
+                          f"$s.CreateShortcut('{smenu}').Save()"],
+                         capture_output=True, timeout=20)
+                except Exception:
+                    pass
+                cmd = f'"{target}"'
             else:
                 cmd = f'"{sys.executable}" "{pathlib.Path(__file__).resolve()}"'
             winreg.SetValueEx(key, "Mitsu", 0, winreg.REG_SZ, cmd)
-            print("autostart installed (Windows registry)")
+            print("autostart + Start Menu + `mitsu` command installed")
             return
         try:
             exe = shutil.which("mitsu") or "mitsu"
@@ -142,7 +163,15 @@ def main(argv: list[str] | None = None) -> None:
             "[Desktop Entry]\nType=Application\nName=Mitsu\n"
             f"Exec={exe}\n"
             "Terminal=false\nX-GNOME-Autostart-enabled=true\n")
-        print(f"autostart installed: {desk}")
+        apps = pathlib.Path("~/.local/share/applications/mitsu.desktop").expanduser()
+        apps.parent.mkdir(parents=True, exist_ok=True)
+        apps.write_text(
+            "[Desktop Entry]\nType=Application\nName=Mitsu\n"
+            "Comment=JARVIS-style desktop AI companion\n"
+            "Categories=Utility;Development;Network;\n"
+            f"Exec={exe}\n"
+            "Terminal=false\nStartupNotify=true\n")
+        print("menu shortcut + autostart installed:", apps, desk)
         return
 
     if args.cmd == "su":

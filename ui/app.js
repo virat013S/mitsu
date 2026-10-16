@@ -186,6 +186,8 @@ async function boot() {
   $('provider').value = providers.some(x => x.usable && x.name === defProv)
     ? defProv : (providers.find(x => x.usable) || {}).name || defProv;
   ddPaint('provider');
+  await refreshModels();
+  if (defModel) { $('model').value = defModel; ddPaint('model'); }  // was silently left on first list entry → moondream = vision-only = dead chat
   const vs = await (await fetch('/api/voice/status')).json();
   synthOK = 'speechSynthesis' in window;
   ddFill('svoice', vs.server.voices.map(v => ({ v: v.id, label: `${v.label}${v.ready ? '' : ' (missing)'}` })));
@@ -351,6 +353,9 @@ $('key-ok').onclick = async () => {
     });
     providers = await (await fetch('/api/providers?probe=1')).json();
     fillProviderDD();
+    $('provider').value = p.name; ddPaint('provider');
+    await refreshModels();
+    if (p.default_model) { $('model').value = p.default_model; ddPaint('model'); }
     profile.default_provider = p.name; profile.default_model = p.default_model || '';
     await fetch('/api/profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile) });
     addMsg('MITSU', `Key saved — ${p.name} is in the picker if it answers (probed live).`);
@@ -647,10 +652,12 @@ $('mtest').onclick = async () => {
 $('ob-go').onclick = async () => {
   profile.display_name = $('ob-name').value || 'friend';
   profile.personality = $('ob-personality').value;
+  profile.completed_onboarding = true;
   await fetch('/api/profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile) });
   $('onboard').classList.add('hidden');
   const g = `Hey ${profile.display_name}, systems are green. What are we building today?`;
   addMsg('MITSU', g); speak(g);
+  if (profile.always_listen !== false) { addMsg('MITSU', 'Ears open 👂 — talk anytime.'); setAlways(true); }
 };
 $('workfocus').onclick = async () => {
   const r = await (await fetch('/api/desktop/work-focus', { method: 'POST' })).json();
