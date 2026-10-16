@@ -9,7 +9,7 @@ from __future__ import annotations
 import threading
 import time
 
-from .paths import APP_HOST, APP_PORT
+from .core.paths import APP_HOST, APP_PORT
 
 
 def _wait_for_server(timeout: float = 20) -> str:

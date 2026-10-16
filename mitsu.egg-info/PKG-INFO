@@ -3,6 +3,7 @@ Name: mitsu
 Version: 2.0.0
 Summary: Mitsu — JARVIS-style autonomous desktop AI companion (offline voice, multi-provider brains, desktop control)
 Requires-Python: >=3.11
+License-File: LICENSE
 Requires-Dist: fastapi>=0.115
 Requires-Dist: uvicorn[standard]>=0.30
 Requires-Dist: pydantic>=2.0
@@ -18,3 +19,4 @@ Provides-Extra: native
 Requires-Dist: pywebview>=4.4; extra == "native"
 Provides-Extra: dev
 Requires-Dist: pytest>=8.0; extra == "dev"
+Dynamic: license-file
