@@ -8,7 +8,7 @@ a pet, a HUD, and full super-user access — loud and logged, never silent.
 Type `mitsu` → window opens → ears open 👂 (says so) → talk or type.
 ```
 
-## Features (all from v1, rebuilt cleaner)
+## Features (all from JARVIS, rebuilt cleaner)
 - **Voice, fully offline**: faster-whisper STT + Piper TTS (local), auto
   arms on boot ("Ears open 👂 — talk anytime."), opt out via 👂 / Alt+A /
   `/always` / ⚙ Settings.
