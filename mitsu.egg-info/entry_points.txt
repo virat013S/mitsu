@@ -1,0 +1,2 @@
+[console_scripts]
+mitsu = mitsu.__main__:main

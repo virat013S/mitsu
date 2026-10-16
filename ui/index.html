@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>MITSU</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6' fill='none' stroke='white' stroke-width='2'/></svg>"/>
+<link rel="stylesheet" href="/ui/styles.css"/>
+</head>
+<body>
+<div id="boot"><div class="bootbox"><pre id="bootlog"></pre><button id="bootbtn" class="hidden">INITIALIZE</button><button id="setupbtn" class="hidden">INSTALL EVERYTHING</button></div></div>
+<header class="hudtop">
+  <div class="brand">MITSU <span id="clock">--:--</span></div>
+  <div class="tstat"><span id="mode">…</span><span id="net" class="pill">…</span></div>
+  <div class="tstat"><span id="pmodel">—</span></div>
+  <div class="tbtns">
+    <button id="vtest" title="Speaker test">🔊 TEST</button>
+    <button id="mtest" title="Mic test">🎙 TEST</button>
+    <button id="settings" title="Settings">⚙</button>
+  </div>
+</header>
+<div class="grid">
+  <aside class="rail left">
+    <section class="card"><h4>Voice</h4>
+      <label class="chk" title="Speak replies aloud"><input type="checkbox" id="speak" checked/><span>Voice replies</span></label>
+      <label class="chk" title="Always use the server voice, even where browser voice exists"><input type="checkbox" id="servervoice"/><span>Server voice</span></label>
+      <label class="chk" title="Boot greeting, alerts, idle nudges"><input type="checkbox" id="speakup" checked/><span>Speak up</span></label>
+      <label class="chk" title="Wake on 'hey jarvis' or your enrolled 'mitsu'"><input type="checkbox" id="wake"/><span>🎧 Wake word</span></label>
+      <label>Mitsu voice</label><div class="dd"><button id="svoice-btn" class="dd-btn">…</button><div id="svoice-list" class="dd-list hidden"></div></div>
+      <select id="svoice" class="hidden"></select>
+      <button id="mdoctor">MIC DOCTOR</button><div id="dout" class="meta"></div>
+      <div id="vstat" class="meta">audio: …</div>
+    </section>
+    <section class="card"><h4>Core</h4>
+      <label>Provider</label><div class="dd"><button id="provider-btn" class="dd-btn">…</button><div id="provider-list" class="dd-list hidden"></div></div>
+      <select id="provider" class="hidden"></select>
+      <label>Model</label><div class="dd"><button id="model-btn" class="dd-btn">…</button><div id="model-list" class="dd-list hidden"></div></div>
+      <select id="model" class="hidden"></select>
+      <label class="chk" title="Let Mitsu pick the model"><input type="checkbox" id="auto" checked/><span>Auto-route</span></label>
+    </section>
+    <section class="card"><h4>System</h4><div id="sys" class="meta">…</div>
+      <button id="workfocus">FOCUS WORK VIEW</button>
+      <div class="row2"><button id="shot">SHOT</button><button id="wins">WINDOWS</button></div>
+    </section>
+    <details class="card"><summary>Research</summary>
+      <input id="rq" placeholder="Research question…"/><button id="rgo">RUN</button><div id="rout" class="meta"></div>
+    </details>
+    <details class="card"><summary>Automations</summary><div id="alist" class="meta"></div>
+      <input id="aname" placeholder="Name"/><input id="abody" placeholder="Message"/>
+      <select id="akind">
+        <option value="interval">Every hour</option>
+        <option value="event-task_done">When a task finishes</option>
+        <option value="event-file_change">When a file changes</option>
+        <option value="event-idle">When idle 30 min</option>
+      </select>
+      <input id="atarget" placeholder="Task name / file path (for events)"/>
+      <button id="aadd">ADD RULE</button>
+    </details>
+    <details class="card"><summary>Skills</summary><div id="sklist" class="meta"></div></details>
+    <details class="card"><summary>Ollama models</summary>
+      <input id="oq" placeholder="Search models…"/><button id="ogo">SEARCH</button>
+      <div id="olib" class="meta"></div><div id="olocal" class="meta"></div>
+    </details>
+    <details class="card"><summary>Memory</summary><input id="mq" placeholder="Search memory…"/>
+      <button id="mgo">SEARCH</button><div id="mout" class="meta"></div>
+      <div id="mstored" class="meta"></div>
+    </details>
+    <details class="card"><summary>Wake word "mitsu"</summary>
+      <div id="wtstat" class="meta">not enrolled</div>
+      <button id="wenroll">🎙 ENROLL (say "mitsu", 3×)</button>
+      <button id="wclear">CLEAR VOICEPRINT</button>
+    </details>
+  </aside>
+  <main class="core">
+    <canvas id="reactor" width="520" height="520"></canvas>
+    <div id="state">STANDBY</div>
+    <div id="log" class="log"></div>
+    <form id="form" class="composer">
+      <button type="button" id="mic" title="Voice input">🎙</button>
+      <button type="button" id="convo" title="Conversation mode: keep listening after each reply">🔁</button>
+      <button type="button" id="always" title="Always listening: mic stays open, talk anytime (JARVIS-style)">👂</button>
+      <textarea id="in" rows="3" placeholder="Speak or type… (Enter sends · Shift+Enter newline)"></textarea>
+      <button type="button" id="shush" title="Stop speaking">🔇</button>
+      <button type="submit">SEND</button>
+    </form>
+  </main>
+  <aside class="rail right">
+    <section class="card"><h4>Activity</h4><div id="act">Idle</div><div id="meta" class="meta"></div></section>
+    <section class="card"><h4>Tasks</h4><div id="tasks" class="meta">none</div></section>
+    <details class="card"><summary>Files</summary>
+      <input id="froot" placeholder="Workspace dir"/>
+      <button id="ftree">LIST</button><div id="flist" class="meta"></div>
+      <div id="fview" class="hidden"><div id="fname" class="meta"></div>
+      <textarea id="ftext" rows="10"></textarea>
+      <div class="row2"><button id="fsave">SAVE (ASKS APPROVAL)</button><button id="fdel">DELETE</button></div></div>
+    </details>
+    <section class="card"><h4>Build</h4>
+      <input id="bgoal" placeholder="Goal, e.g. portfolio website"/>
+      <input id="bdest" placeholder="Directory, e.g. /home/you/work/site"/>
+      <button id="bgo">PLAN + BUILD</button><div id="bout" class="meta"></div>
+    </section>
+    <section class="card"><h4>Alerts</h4><div id="alerts" class="meta">—</div></section>
+  </aside>
+</div>
+<div id="onboard" class="modal hidden"><div class="card big">
+  <h2>ONLINE. Who am I speaking with?</h2>
+  <input id="ob-name" placeholder="Your name"/>
+  <div class="row2"><select id="ob-personality">
+    <option>friendly</option><option>professional</option><option>playful</option>
+    <option>sarcastic</option><option>calm</option><option>minimal</option>
+  </select><button id="ob-go">BEGIN</button></div>
+</div></div>
+<div id="sudo" class="modal hidden"><div class="card big">
+  <h3>SUDO REQUIRED</h3><p id="sudo-why"></p>
+  <input id="sudo-pw" type="password" placeholder="sudo password (never stored)"/>
+  <div class="row2"><button id="sudo-ok">APPROVE ONCE</button><button id="sudo-no">DENY</button></div>
+</div></div>
+<div id="keymodal" class="modal hidden"><div class="card big">
+  <h3>API KEY REQUIRED</h3><p id="key-why" class="meta"></p>
+  <label>Provider <select id="key-prov"></select></label>
+  <input id="key-in" type="password" placeholder="Paste API key (stored in OS keychain)"/>
+  <div class="row2"><button id="key-ok">SAVE KEY</button><button id="key-no">CLOSE</button></div>
+</div></div>
+<div id="sumodal" class="modal hidden"><div class="card big">
+  <h3 id="su-title">SUPER USER</h3><p id="su-why" class="meta"></p>
+  <input id="su-pass" type="password" placeholder="pass-phase (never stored, digest only)"/>
+  <div class="row2"><button id="su-ok">ARM / UNLOCK</button><button id="su-no">CANCEL</button></div>
+  <p id="su-note" class="meta"></p>
+</div></div>
+<div id="approval" class="modal hidden"><div class="card big">
+  <h3>PERMISSION</h3><p id="ap-why" class="meta"></p>
+  <div class="row2"><button id="ap-ok">APPROVE ONCE</button><button id="ap-no">DENY</button></div>
+</div></div>
+<div id="cfg" class="modal hidden"><div class="card big">
+  <h3>SETTINGS</h3>
+  <label>Name <input id="c-name"/></label>
+  <label>Workspace <input id="c-ws"/></label>
+  <label>Theme <select id="c-theme"><option value="void">Void (black)</option><option value="paper">Paper (white)</option></select></label>
+  <label class="chk" title="Mic opens on boot — talk anytime, no button needed"><input type="checkbox" id="c-always" checked/><span>👂 Always listening on boot</span></label>
+  <div class="row2"><button id="c-save">SAVE</button><button id="c-close">CLOSE</button></div>
+</div></div>
+<div id="setup" class="modal hidden"><div class="card big">
+  <h3>INSTALL EVERYTHING</h3><div id="slist" class="meta"></div>
+  <div class="row2"><button id="sinstall">INSTALL MISSING</button><button id="sollama">OLLAMA ENGINE (ASKS SUDO)</button><button id="sclose">CLOSE</button></div>
+  <div id="sout" class="meta"></div>
+</div></div>
+<div id="pet" class="pet hidden"><span id="pface"></span><span id="pmsg"></span></div>
+<div id="keys" class="modal hidden"><div class="card big">
+  <h3>SHORTCUTS</h3>
+  <div class="meta">/ focus input · Ctrl+Enter send · Alt+M mic · Alt+A always-listen · Alt+O ollama shop · Alt+R research ·
+Alt+F files · Alt+S settings · Esc stop voice / close · Ctrl+Shift+X stop everything · Enter sends · Shift+Enter newline</div>
+  <h3>SLASH COMMANDS</h3>
+  <div class="meta">/help /build &lt;goal&gt; /research &lt;q&gt; /remember &lt;fact&gt; /forget &lt;word&gt;
+  /model [provider] [model] /voice &lt;name&gt; /tasks /pull &lt;ollama-model&gt; /shot /what [question] /clear /stop /always</div>
+  <div class="row2"><button id="keys-close">CLOSE</button></div>
+</div></div>
+<script src="/ui/app.js"></script>
+</body>
+</html>

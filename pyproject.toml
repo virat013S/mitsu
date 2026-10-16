@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mitsu"
+version = "2.0.0"
+description = "Mitsu — JARVIS-style autonomous desktop AI companion (offline voice, multi-provider brains, desktop control)"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.0",
+    "httpx>=0.27",
+    "keyring>=25.0",
+]
+
+[project.optional-dependencies]
+voice = ["faster-whisper>=1.0", "numpy>=1.26"]
+tray = ["pystray>=0.19", "Pillow>=10.0"]
+native = ["pywebview>=4.4"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+mitsu = "mitsu.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["mitsu*"]
+
+[tool.setuptools.package-data]
+mitsu = ["ui/**/*"]
