@@ -71,4 +71,15 @@ mitsu                      # dance
   the plan/consent modal is the only path for privileged actions.
 - **Voice training data stays local** (whisper + Piper run on-device).
 
+## Misuse
+Mitsu is built for good — automate your work, control your own desktop,
+learn and build things. If someone takes it and misuses it — harms anyone's
+system, privacy, data, or breaks any law or platform rule with it — that is
+**their choice and their responsibility, not ours**. We ship the tool with
+safety gates (consent-first permissions, locked super user, logs, no silent
+sudo); once it leaves this repo, what you do with it is on you. Mitsu's
+authors and contributors are **not liable for any misuse, damage, or loss**
+caused by any user of this software. Use it kindly, on machines you have the
+right to control.
+
 See `docs/ERRORS.md` for every error that can appear and its fix.
