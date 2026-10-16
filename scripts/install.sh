@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mitsu v2 installer — system deps, python deps, voices, autostart.
+# Mitsu installer — system deps, python deps, voices, autostart.
 set -e
 [ "$(id -u)" = 0 ] && { echo "run as your user (no sudo from inside scripts); it will ask when needed"; exit 1; }
 

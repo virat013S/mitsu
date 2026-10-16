@@ -1,4 +1,4 @@
-# Mitsu v2
+# Mitsu
 
 A JARVIS-style **autonomous desktop AI companion** that lives on your computer:
 always-on offline voice, many provider brains, desktop awareness and control,
@@ -30,7 +30,7 @@ Type `mitsu` → window opens → ears open 👂 (says so) → talk or type.
 - **Desktop control, permissions-first**: workspaces focus, screenshots, app
   launching — with a sudo plan/consent flow (`/api/sudo/plan`). Sudo is never
   asked from chat, never stored.
-- **Super user access (new in v2)**: arm once with a pass-phase
+- **Super user access**: arm once with a pass-phase
   (`/su setup <words>`), unlock per-session (`/su unlock`) → local admin-grade
   shell commands (`/api/su/exec`) with a destructive-pattern blocklist and a
   full `su.log`. Nothing runs quietly.

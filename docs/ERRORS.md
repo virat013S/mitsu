@@ -1,4 +1,4 @@
-# ERRORS — every error Mitsu v2 can surface, what it means, the fix
+# ERRORS — every error Mitsu can surface, what it means, the fix
 
 | Message / symptom | Cause | Fix |
 |---|---|---|
@@ -18,4 +18,4 @@
 | window doesn't open, terminal shows a URL | pywebview/WebView2 missing | `pip install pywebview` (Linux needs `python3-gobject`); Windows bundles ship WebView2Loader |
 | `mitsu` command not found | Editable install not done | `pip install -e .` then restart shell |
 | Old answers after an update | Running the pre-update process | Restart `mitsu` — the server keeps code from process start |
-| Window won't open after an upgrade (`No module named …`) | Old process / stale install with renamed v2 modules | `pip install -e ".[tray,native,voice,dev]"` then restart `mitsu` |
+| Window won't open after an upgrade (`No module named …`) | Old process / stale install with renamed modules | `pip install -e ".[tray,native,voice,dev]"` then restart `mitsu` |
