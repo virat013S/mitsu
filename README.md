@@ -4,9 +4,16 @@ A JARVIS-style **autonomous desktop AI companion** that lives on your computer:
 always-on offline voice, many provider brains, desktop awareness and control,
 a pet, a HUD, and full super-user access — loud and logged, never silent.
 
-```
 Type `mitsu` → window opens → ears open 👂 (says so) → talk or type.
-```
+
+## Download (no git, no building)
+Grab a ready build from [Releases](https://github.com/virat013S/mitsu/releases)
+- **Windows:** `mitsu-windows.zip` → unzip → double-click `mitsu.exe`
+- **Linux:** `mitsu-linux.tar.gz` → untar → `./mitsu`
+
+First launch runs onboarding once and handles the rest — the offline voice
+stack (whisper + Piper engine + voice) downloads itself once, then runs
+fully offline. Nothing to hand-download, ever.
 
 ## Features (all from JARVIS, rebuilt cleaner)
 - **Voice, fully offline**: faster-whisper STT + Piper TTS (local), auto
@@ -51,7 +58,7 @@ Type `mitsu` → window opens → ears open 👂 (says so) → talk or type.
 | modules | `agents skills tasks automation workspace tools permissions browser research pet setup tray server` | |
 | ui | `ui/` | static HUD (same window, pywebview if available) |
 
-## Run
+## Run from source
 ```bash
 git clone https://github.com/virat013S/mitsu && cd mitsu
 ./install          # any shell (bash/zsh/fish/POSIX); Windows: install.bat

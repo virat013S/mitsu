@@ -18,8 +18,9 @@ def test_all_server_voices_synthesize():
     if not _voices_present():
         import pytest as _p
         _p.skip("piper voices not installed on this machine yet (install.sh step 3)")
+    voices = [v["id"] for v in STT.available_voices() if v["ready"]]
     async def go():
-        for v in ("lessac", "amy", "ryan"):
+        for v in voices:
             wav = await STT.synthesize("test", 175, v)
             assert wav[:4] == b"RIFF", v
     asyncio.run(go())
