@@ -10,6 +10,8 @@ Type `mitsu` → window opens → ears open 👂 (says so) → talk or type.
 Grab a ready build from [Releases](https://github.com/virat013S/mitsu/releases)
 - **Windows:** `mitsu-windows.zip` → unzip → double-click `mitsu.exe`
 - **Linux:** `mitsu-linux.tar.gz` → untar → `./mitsu`
+- **macOS:** no bundle down there — use **From source** below (see also the
+  macOS section; it's one `git clone` plus one `brew`, ~10 min)
 
 First launch runs onboarding once and handles the rest — the offline voice
 stack (whisper + Piper engine + voice) downloads itself once, then runs
@@ -72,7 +74,8 @@ constraints are earthly, not Mitsu's).
 ## Run from source
 ```bash
 git clone https://github.com/virat013S/mitsu && cd mitsu
-./install          # any shell (bash/zsh/fish/POSIX); Windows: install.bat
+./install          # any shell (bash/zsh/fish/POSIX); Windows: install.bat; macOS: auto-detects Darwin
+brew install sox ffmpeg   # macOS only — mic capture (sox rec / ffmpeg avfoundation)
 mitsu doctor       # verify
 mitsu              # dance
 ```
