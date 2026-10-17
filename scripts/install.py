@@ -27,6 +27,18 @@ PIPER_DELTA = {
 }
 
 
+def piper_shim(target: Path) -> None:
+    """macOS has no prebuilt piper release — wrap `python3 -m piper`
+    (pip piper-tts) in a tiny POSIX shim so the server detects an engine
+    exactly like on Linux/Windows, same CLI args, zero code forks."""
+    shim = target / "piper"
+    target.mkdir(parents=True, exist_ok=True)
+    shim.write_text("#!/bin/sh\nexec python3 -m piper \"$@\"\n")
+    import stat as _s
+    shim.chmod(shim.stat().st_mode | _s.S_IEXEC)
+    print("  engine: pip piper-tts shim written (" + str(shim) + ")")
+
+
 def say(*a) -> None:
     print("\n== " + " ".join(a) + " ==", flush=True)
 
@@ -113,10 +125,21 @@ def install_piper_engine() -> None:
     Downloaded into voices/piper/ so status()/synthesize() find it forever,
     inside the app's own data dir (survives pip wipes, no system paths)."""
     vdir = data_dir() / "voices"
-    win = platform.system().lower().startswith("win")
+    sysname = platform.system().lower()
+    win = sysname.startswith("win")
+    mac = sysname == "darwin"
     machine = platform.machine().lower()
     arch = ("x86_64" if machine in ("amd64", "x86_64", "")
             else "aarch64" if machine in ("arm64", "aarch64") else machine)
+    if mac:
+        say_mac_brew_hint = ("  macOS needs: brew install sox ffmpeg && pip install piper-tts")
+        ok = run([sys.executable, "-m", "pip", "install", "piper-tts"])
+        if ok:
+            piper_shim(vdir / "piper")
+            print("  then install sox + ffmpeg for the mic: " + "brew install sox ffmpeg")
+        else:
+            print(f"  ! pip piper-tts failed — run manually: {say_mac_brew_hint}")
+        return
     key = ("windows" if win else "linux", arch)
     entry = PIPER_DELTA.get(key)
     if not entry:

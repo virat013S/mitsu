@@ -23,7 +23,7 @@ def status() -> dict:
         "engine": "faster-whisper",
         "model": MODEL,
         "available": True,
-        "recorder": shutil.which("parecord") or shutil.which("arecord"),
+        "recorder": _pick_recorder(),
     }
 
 
@@ -31,7 +31,7 @@ def doctor() -> dict:
     """Mic troubleshooting (§32): recorders, PipeWire/ALSA sources, hints."""
     import shutil as _sh
     import subprocess as _sp
-    rec = _sh.which("parecord") or _sh.which("arecord")
+    rec = _pick_recorder()
     sources: list[str] = []
     via = ""
     if _sh.which("parecord"):
@@ -61,7 +61,7 @@ def doctor() -> dict:
     except Exception:
         pass
     if not rec and not sd_mics:
-        hints.append("no recorder found: Windows: pip install sounddevice · Linux: pulseaudio-utils/alsa-utils")
+        hints.append("no recorder found: macOS: brew install sox ffmpeg · Windows: pip install sounddevice · Linux: pulseaudio-utils/alsa-utils")
     if rec and not sources:
         hints.append("no sources: is PipeWire running? `systemctl --user status pipewire pipewire-pulse`")
         hints.append("check input volume + default source in `pavucontrol` (Input Devices tab, unmute)")
@@ -158,6 +158,36 @@ def record(seconds: int = 5) -> str:
     return _record_cli(seconds)
 
 
+def _pick_recorder() -> str:
+    """Mic recorder per OS: parecord (desktop-Linux PipeWire) → arecord
+    (ALSA) → sox `rec` (macOS/any) → ffmpeg (macOS/any, avfoundation)."""
+    p = shutil.which("parecord") or shutil.which("arecord")
+    if p:
+        return p
+    return shutil.which("rec") or shutil.which("ffmpeg") or ""
+
+
+def _record_cmd(rec: str, raw_out=True, seconds: int | None = None) -> list[str]:
+    """s16le mono 16 kHz RAW to stdout for the given recorder."""
+    if rec.endswith("parecord"):
+        cmd = [rec, "--rate=16000", "--channels=1", "--format=s16le",
+               "--file-format=raw", "/dev/stdout"]
+    elif rec.endswith("arecord"):
+        cmd = [rec, "-r", "16000", "-c", "1", "-f", "S16_LE", "-t", "raw", "-"]
+    elif rec.endswith("ffmpeg"):  # macOS avfoundation / coreaudio
+        cmd = ["ffmpeg", "-loglevel", "quiet", "-f", "avfoundation",
+               "-i", ":0", "-ac", "1", "-ar", "16000",
+               "-f", "s16le", "-c:a", "pcm_s16le", "pipe:1"]
+        if seconds:
+            cmd = ["ffmpeg", "-loglevel", "quiet", "-t", str(seconds),
+                   "-f", "avfoundation", "-i", ":0", "-ac", "1", "-ar", "16000",
+                   "-f", "s16le", "-c:a", "pcm_s16le", "pipe:1"]
+    else:  # sox `rec` (duration optional — CLI wrappers read a fixed byte
+        # count then kill the child, so no trim needed)
+        cmd = ["rec", "-q", "-c", "1", "-r", "16000", "-t", "s16", "-"]
+    return cmd
+
+
 def _record_cli(seconds: int = 5) -> str:
     """Fixed-length capture that always terminates.
 
@@ -168,17 +198,13 @@ def _record_cli(seconds: int = 5) -> str:
     the bytes into a WAV ourselves (no header-finalize races).
     """
     import time as _t
-    rec = shutil.which("parecord") or shutil.which("arecord")
+    rec = _pick_recorder()
     if not rec:
-        raise RuntimeError("no mic recorder (Windows: pip install sounddevice · "
+        raise RuntimeError("no mic recorder (macOS: brew install sox ffmpeg · "
+                           "Windows: pip install sounddevice · "
                            "Linux: pulseaudio-utils/alsa-utils)")
     sr, want = 16000, seconds * 16000 * 2  # s16le bytes
-    if rec.endswith("parecord"):
-        cmd = [rec, "--rate=16000", "--channels=1", "--format=s16le",
-               "--file-format=raw", "/dev/stdout"]
-    else:
-        cmd = [rec, "-r", "16000", "-c", "1", "-f", "S16_LE", "-t", "raw",
-               "-d", str(seconds)]
+    cmd = _record_cmd(rec, seconds=seconds)
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     except Exception as e:
@@ -255,14 +281,11 @@ def _record_vad_sd(max_seconds: int = 30, silence_end: float = 1.6,
 
 def _record_vad_pipe(max_seconds: int = 30, silence_end: float = 1.6,
                      arm_timeout: float = 10.0) -> dict:
-    rec = shutil.which("parecord") or shutil.which("arecord")
+    rec = _pick_recorder()
     if not rec:
-        raise RuntimeError("no mic recorder (install pulseaudio-utils or alsa-utils)")
-    if rec.endswith("parecord"):
-        cmd = [rec, "--rate=16000", "--channels=1", "--format=s16le",
-               "--file-format=raw", "/dev/stdout"]
-    else:
-        cmd = [rec, "-r", "16000", "-c", "1", "-f", "S16_LE", "-t", "raw", "-"]
+        raise RuntimeError("no mic recorder (macOS: brew install sox ffmpeg · "
+                           "install pulseaudio-utils or alsa-utils on Linux)")
+    cmd = _record_cmd(rec)
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     except Exception:

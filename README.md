@@ -15,6 +15,17 @@ First launch runs onboarding once and handles the rest — the offline voice
 stack (whisper + Piper engine + voice) downloads itself once, then runs
 fully offline. Nothing to hand-download, ever.
 
+## macOS
+Apple doesn't ship Linux/Windows binaries, so Macs run **from source** (Python —
+one extra step, works natively via Cocoa/CoreAudio):
+1. `git clone https://github.com/virat013S/mitsu && cd mitsu && ./install`
+2. `brew install sox ffmpeg` — the Mic uses `sox rec`/`ffmpeg` on macOS
+
+The installer detects Darwin automatically: it pulls `piper-tts` via pip and
+wraps it in a shim so TTS behaves identically, no code forks. Prebuilt
+`.app` bundles for Mac are planned (a bundle must be built *on* a Mac —
+constraints are earthly, not Mitsu's).
+
 ## Features (all from JARVIS, rebuilt cleaner)
 - **Voice, fully offline**: faster-whisper STT + Piper TTS (local), auto
   arms on boot ("Ears open 👂 — talk anytime."), opt out via 👂 / Alt+A /
