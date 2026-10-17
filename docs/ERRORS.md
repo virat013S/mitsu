@@ -20,3 +20,4 @@
 | Old answers after an update | Running the pre-update process | Restart `mitsu` — the server keeps code from process start |
 | `install.sh` fails on my shell (zsh/fish/…) | Old installer was bash-only | Shell-independent now: `sh scripts/install.sh` (wrapper) or `python3 scripts/install.py` — real installer is python |
 | Window won't open after an upgrade (`No module named …`) | Old process / stale install with renamed modules | `pip install -e ".[tray,native,voice,dev]"` then restart `mitsu` |
+| `GLib-GIO-CRITICAL … g_application_run() cannot acquire the default main context` | Two GLib loops in one process: the tray thread stole the main context before the GTK window | Fixed — window runs alone on Linux; tray only in browser-fallback mode. `git pull` and rerun |

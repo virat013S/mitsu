@@ -231,14 +231,23 @@ def main(argv: list[str] | None = None) -> None:
         run()
         return
 
-    # default + `native`: desktop window, graceful fallback to serve+open browser
-    if not getattr(args, "no_tray", False):
+    # default + `native`: desktop window, graceful fallback to serve+open browser.
+    # GTK rule (Linux): ONE GLib main context per process. The pywebview window
+    # must own the main thread ALONE — a tray GLib loop started earlier steals
+    # the default context and kills the window (g_application_run critical).
+    # So: window first; tray only in the fallback server mode (or on Windows,
+    # where the tray is WinForms-based and harmless).
+    no_tray = getattr(args, "no_tray", False)
+    if sys.platform == "win32" and not no_tray:
         _start_tray()
     try:
         from mitsu.native import open_window
         open_window()
+        return
     except Exception as e:
         print(f"app window unavailable ({e})")
+        if not no_tray and sys.platform != "win32":
+            _start_tray()
         from mitsu.core.paths import APP_HOST as _H, APP_PORT as _P
         print(f"serving for browser instead:  ==>  http://{_H}:{_P}  <==")
         import webbrowser
