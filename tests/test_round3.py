@@ -1,0 +1,44 @@
+from mitsu.setup import deps as D
+from mitsu.providers import shop as S
+from mitsu.voice import server_tts as ST
+from mitsu.pet import window as PW
+
+
+def test_setup_status_shape():
+    items = D.status()
+    ids = {i["id"] for i in items}
+    assert any(i.startswith("pip:") for i in ids)
+    assert "piper" in ids and "whisper" in ids and "ollama-bin" in ids
+    assert all({"id", "label", "size", "ok", "hint"} <= set(i) for i in items)
+    # this machine: piper + all voices + ollama present
+    by_id = {i["id"]: i for i in items}
+    if not by_id["piper"]["ok"]:
+        import pytest as _p
+        _p.skip("piper not installed on this machine yet (install step 3)")
+
+
+def test_shop_search_and_local():
+    assert len(S.search("")) >= 15
+    assert any("qwen" in m["name"] for m in S.search("code"))
+    local = S.local()
+    if not local:
+        # ollama service down (a valid state on any machine) — nothing locally loaded
+        import pytest as _p
+        _p.skip("ollama not reachable on this machine")
+    # whatever is actually installed is fine — model choice is the user's
+    assert all(m["name"] and " " not in m["name"] for m in local)
+
+
+def test_voices_listed_are_engine_compatible():
+    ids = {v["id"] for v in ST.available_voices()}
+    assert {"lessac", "ljspeech", "arctic", "kristin", "dante", "mochi"} <= ids
+    # newer models abort the bundled piper (phoneme map) — must not be offered
+    assert not ({"amy", "ryan", "joe", "sparkle"} & ids)
+    assert ST.pitch_of("mochi") > 1.0
+    assert ST.pitch_of("nope") == 1.0
+
+
+def test_pet_window_has_characters():
+    for c in ("neko", "panda", "kitsune", "hoshi", "kaito"):
+        assert c in PW.HTML
+    assert "localStorage" in PW.HTML  # persists picker choice
