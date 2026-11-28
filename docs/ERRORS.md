@@ -70,7 +70,10 @@ here with the fix.
 | Window does not open, terminal prints a URL | pywebview or WebView2 is missing | `python3 -m pip install pywebview`; on Linux you may also need `python3-gobject`. The browser UI still works |
 | Window fails after an upgrade with `No module named ...` | The old process or an old editable install is still active | `python3 -m pip install -e ".[tray,native,voice,dev]"`, then restart `mitsu` |
 | `GLib-GIO-CRITICAL ... g_application_run() cannot acquire the default main context` | Two GLib loops in one process; the tray thread took the main context | Fixed: the window runs alone on Linux and the tray is only used in browser-fallback mode |
-| `PyInstaller WinError 5` while rebuilding Windows | A stale `mitsu.exe` is still running under Wine | `wineserver -k`, wait five seconds, rebuild, then `git checkout -- mitsu.spec` |
+| `PyInstaller WinError 5` while rebuilding Windows | A stale `mitsu.exe` is still running under Wine | `wineserver -k`, wait five seconds, rebuild, then `git checkout -- packaging/mitsu.spec` |
+| Packaged app prints `invalid choice: from multiprocessing.resource_tracker...` | PyInstaller makes `sys.executable` the app, so Python's resource tracker re-enters the CLI with `-c` | Fixed in `mitsu/__main__.py`: frozen builds handle the tracker command and call `freeze_support()` |
+| Packaged macOS app opens a blank window | PyInstaller stores data under `Contents/Resources`, not beside the executable | Fixed: the UI lookup also checks `Contents/Resources/ui` |
+| A packaged build asks to `pip install` a missing Python package | Frozen builds do not have pip; the dependency was not included in the build | Rebuild with the dependency installed. The source install still uses the setup screen |
 | Old answers after an update | The running server keeps the code from process start | Restart `mitsu` |
 | The UI still looks like the previous build | The browser cached `app.js` or `styles.css` | Assets are served with `Cache-Control: no-store` and versioned URLs. Hard-refresh one ancient tab if needed |
 

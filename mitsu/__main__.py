@@ -53,8 +53,37 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _frozen_multiprocessing() -> None:
+    """Let a frozen build act as Python's multiprocessing helpers.
+
+    PyInstaller replaces sys.executable with mitsu, so libraries that spawn a
+    resource tracker call ``mitsu -c "from multiprocessing.resource_tracker
+    import main;main(fd)"``. Without this branch the CLI parser rejects the
+    -c argument and the tracker dies. spawn-based children are handled by
+    freeze_support().
+    """
+    import sys as _sys
+    if len(_sys.argv) >= 3 and _sys.argv[1] == "-c":
+        code = _sys.argv[2]
+        prefix = "from multiprocessing.resource_tracker import main;main("
+        if code.startswith(prefix):
+            try:
+                fd = int(code[len(prefix):].split(")", 1)[0])
+                from multiprocessing.resource_tracker import main as _tracker_main
+                _tracker_main(fd)
+            except Exception:
+                pass
+            raise SystemExit(0)
+    try:
+        import multiprocessing as _mp
+        _mp.freeze_support()
+    except Exception:
+        pass
+
+
 def main(argv: list[str] | None = None) -> None:
     import os
+    _frozen_multiprocessing()
     args = build_parser().parse_args(argv)
     os.environ.setdefault("MITSU_PORT", str(args.port))
     os.environ.setdefault("MITSU_HOST", args.host)
