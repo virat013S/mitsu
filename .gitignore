@@ -7,6 +7,6 @@ __pycache__/
 dist/
 dist-windows/
 build/
-*.spec
+/*.spec
 .venv/
 .DS_Store

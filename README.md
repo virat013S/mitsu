@@ -75,6 +75,30 @@ mitsu
 The first launch opens a short setup screen. The voice models download once.
 After that, listening and speaking work offline.
 
+## Packaged builds
+
+Tagged releases include portable builds made by GitHub Actions:
+
+- Linux x64: unpack the `.tar.gz`, then run `mitsu/mitsu`.
+- Windows x64: unpack the `.zip`, then run `mitsu/mitsu.exe`.
+- macOS arm64: unzip `Mitsu.app`, then open it. The first launch may need
+  right-click -> Open because the build is not notarized.
+
+The packaged builds carry Python and the runtime dependencies, so they do not
+need a separate Python install. They use the same `~/.local/share/mitsu` data
+directory and the same first-run setup as a source install. Voice models are
+still downloaded on first use, not baked into the archive.
+
+To build one locally:
+
+```bash
+python3 -m pip install -e ".[voice,native,tray]"
+python3 -m pip install "pyinstaller>=6.10,<7"
+python3 packaging/build.py
+```
+
+The output lands in `dist/`. The workflow is in `.github/workflows/build.yml`.
+
 ## Local models
 
 Mitsu uses Ollama at `http://127.0.0.1:11434` by default. If Ollama is installed

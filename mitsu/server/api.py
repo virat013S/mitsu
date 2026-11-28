@@ -27,8 +27,10 @@ def _ui_dir() -> Path:
     if getattr(_sys, "frozen", False):
         base = Path(getattr(_sys, "_MEIPASS", "")) if hasattr(_sys, "_MEIPASS") else None
         if base:
-            cands += [base / "ui", base.parent / "ui"]
+            cands += [base / "ui", base.parent / "ui",
+                      base.parent / "Resources" / "ui"]
         cands.append(Path(_sys.executable).resolve().parent / "ui")
+        cands.append(Path(_sys.executable).resolve().parent.parent / "Resources" / "ui")
     cands.append(Path(__file__).resolve().parent.parent.parent / "ui")
     for c in cands:
         if c and (c / "index.html").exists():
