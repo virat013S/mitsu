@@ -97,7 +97,9 @@ python3 -m pip install "pyinstaller>=6.10,<7"
 python3 packaging/build.py
 ```
 
-The output lands in `dist/`. The workflow is in `.github/workflows/build.yml`.
+The output lands in `dist/`. The script starts the packaged server and checks
+`/api/health` and the UI before it writes the archive. The workflow is in
+`.github/workflows/build.yml`.
 
 ## Local models
 

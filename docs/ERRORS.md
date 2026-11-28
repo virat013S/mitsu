@@ -72,6 +72,8 @@ here with the fix.
 | `GLib-GIO-CRITICAL ... g_application_run() cannot acquire the default main context` | Two GLib loops in one process; the tray thread took the main context | Fixed: the window runs alone on Linux and the tray is only used in browser-fallback mode |
 | `PyInstaller WinError 5` while rebuilding Windows | A stale `mitsu.exe` is still running under Wine | `wineserver -k`, wait five seconds, rebuild, then `git checkout -- packaging/mitsu.spec` |
 | Packaged app prints `invalid choice: from multiprocessing.resource_tracker...` | PyInstaller makes `sys.executable` the app, so Python's resource tracker re-enters the CLI with `-c` | Fixed in `mitsu/__main__.py`: frozen builds handle the tracker command and call `freeze_support()` |
+| Linux CI fails with `Cannot uninstall pip ... no RECORD file` | The Linux runtime step exported `/usr/lib/python3/dist-packages` globally, so setup-python imported Debian's pip | Scope `PYTHONPATH` to the PyInstaller build step; `pip` then uses the setup-python environment |
+| `The configuration 'macos-14-arm64-us-default' is not supported` | GitHub retired macOS 14 runners on November 2, 2026 | Build on `macos-15` (arm64) |
 | Packaged macOS app opens a blank window | PyInstaller stores data under `Contents/Resources`, not beside the executable | Fixed: the UI lookup also checks `Contents/Resources/ui` |
 | A packaged build asks to `pip install` a missing Python package | Frozen builds do not have pip; the dependency was not included in the build | Rebuild with the dependency installed. The source install still uses the setup screen |
 | Old answers after an update | The running server keeps the code from process start | Restart `mitsu` |

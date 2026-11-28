@@ -15,12 +15,16 @@ first-run voice setup feel broken.
 """
 from __future__ import annotations
 
+import json
 import os
 import platform
+import socket
 import subprocess
 import sys
 import tarfile
 import tempfile
+import time
+import urllib.request
 import zipfile
 from pathlib import Path
 
@@ -60,6 +64,53 @@ def executable() -> Path:
     return DIST / "mitsu" / "mitsu"
 
 
+def smoke_server(exe: Path, env: dict[str, str]) -> None:
+    """Start the packaged server and prove the API and UI are reachable."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    proc = subprocess.Popen(
+        [str(exe), "--port", str(port), "--no-tray", "serve"],
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
+            if proc.poll() is not None:
+                raise RuntimeError(f"server exited early (code {proc.returncode})")
+            try:
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/api/health", timeout=1
+                ) as resp:
+                    if resp.status == 200:
+                        payload = json.loads(resp.read().decode("utf-8"))
+                        if payload.get("ok"):
+                            break
+            except Exception:
+                pass
+            time.sleep(0.25)
+        else:
+            raise RuntimeError("server did not become healthy within 60s")
+
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/ui/app.js", timeout=5
+        ) as resp:
+            body = resp.read()
+            if resp.status != 200 or len(body) < 1000:
+                raise RuntimeError("packaged UI did not serve app.js")
+        print("server smoke: health and UI ok", flush=True)
+    finally:
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+
+
 def smoke() -> None:
     exe = executable()
     if not exe.exists():
@@ -71,6 +122,7 @@ def smoke() -> None:
         # Doctor imports the voice, provider, and keyring paths without
         # opening a window. It catches missing audio hardware on its own.
         run([str(exe), "doctor"], timeout=90, env=env)
+        smoke_server(exe, env)
 
 
 def pack() -> Path:
