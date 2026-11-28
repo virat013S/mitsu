@@ -21,7 +21,7 @@ jobs:
             name: linux-x64
           - os: windows-latest
             name: windows-x64
-          - os: macos-14
+          - os: macos-15
             name: macos-arm64
 
     steps:
@@ -39,7 +39,6 @@ jobs:
           sudo apt-get install -y \
             python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1 \
             libwebkit2gtk-4.1-0 libportaudio2 ffmpeg
-          echo "PYTHONPATH=/usr/lib/python3/dist-packages" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: |
@@ -48,6 +47,8 @@ jobs:
           python -m pip install "pyinstaller>=6.10,<7"
 
       - name: Build portable app
+        env:
+          PYTHONPATH: ${{ runner.os == 'Linux' && '/usr/lib/python3/dist-packages' || '' }}
         run: python packaging/build.py
 
       - name: Upload artifact
